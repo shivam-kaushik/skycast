@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useLocation } from '@/src/hooks/useLocation'
 import WeatherMapView from '@/src/components/radar/WeatherMapView'
 import type { MapLayer, WeatherMapHandle } from '@/src/components/radar/WeatherMapView'
+import RadarLegend from '@/src/components/radar/RadarLegend'
 import {
   BG,
   TEXT_PRIMARY,
@@ -98,6 +99,12 @@ export default function RadarScreen() {
 
   const isLoading = weatherLoading || aqLoading
 
+  useEffect(() => {
+    setFrameIndex(0)
+    setTotalFrames(0)
+    setIsPlaying(true)
+  }, [activeLayer, lat, lon])
+
   if (isLoading || !weather) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -137,7 +144,7 @@ export default function RadarScreen() {
 
       {/* Top overlay: location + layer info */}
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
-        <View style={styles.locationBar}>
+        <View style={styles.topPill}>
           <Ionicons name="location-sharp" size={14} color={activeConfig.color} />
           <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
           <View style={[styles.layerBadge, { borderColor: activeConfig.color }]}>
@@ -148,11 +155,15 @@ export default function RadarScreen() {
         </View>
       </SafeAreaView>
 
+      <View style={styles.legendOverlay} pointerEvents="none">
+        <RadarLegend layer={activeLayer} />
+      </View>
+
       {/* Bottom overlay: layer selector + animation controls */}
       <View style={styles.bottomOverlay} pointerEvents="box-none">
         {/* Animation controls (precipitation only) */}
-        {activeLayer === 'precipitation' && totalFrames > 0 && (
-          <View style={styles.animationBar} pointerEvents="auto">
+        {totalFrames > 0 && (
+          <View style={styles.animationPill} pointerEvents="auto">
             <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
               <Ionicons
                 name={isPlaying ? 'pause' : 'play'}
@@ -172,16 +183,14 @@ export default function RadarScreen() {
                 />
               ))}
             </View>
-            <View style={styles.nowBadge}>
-              <Text style={styles.nowBadgeText}>
-                {frameIndex >= totalFrames - 2 ? 'FORECAST' : 'LIVE'}
-              </Text>
+            <View style={styles.forecastBadge}>
+              <Text style={styles.forecastText}>FORECAST</Text>
             </View>
           </View>
         )}
 
         {/* Layer selector */}
-        <View style={styles.layerSelector} pointerEvents="auto">
+        <View style={styles.layerPill} pointerEvents="auto">
           {LAYERS.map((layer) => {
             const isActive = layer.key === activeLayer
             return (
@@ -241,19 +250,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  locationBar: {
+  topPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(10,15,30,0.82)',
-    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(20,26,40,0.85)',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    alignSelf: 'flex-start',
-    maxWidth: '95%',
+    borderColor: 'rgba(255,255,255,0.10)',
+    alignSelf: 'stretch',
   },
   cityName: {
     fontSize: 14,
@@ -262,10 +271,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   layerBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
     borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.10)',
   },
   layerBadgeText: {
     fontSize: 10,
@@ -281,24 +291,29 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 10,
   },
+  legendOverlay: {
+    position: 'absolute',
+    left: 16,
+    top: 96,
+  },
   // Animation bar
-  animationBar: {
+  animationPill: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(10,15,30,0.88)',
-    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(20,26,40,0.88)',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: GLASS_BORDER,
+    borderColor: 'rgba(255,255,255,0.10)',
     gap: 12,
   },
   playButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(74,158,255,0.15)',
+    backgroundColor: 'rgba(74,158,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -326,36 +341,38 @@ const styles = StyleSheet.create({
   timelineDotPast: {
     backgroundColor: 'rgba(74,158,255,0.45)',
   },
-  nowBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: 'rgba(74,158,255,0.15)',
+  forecastBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(74,158,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(74,158,255,0.28)',
   },
-  nowBadgeText: {
+  forecastText: {
     fontSize: 10,
     fontWeight: '700',
     color: ACCENT,
     letterSpacing: 0.5,
   },
   // Layer selector
-  layerSelector: {
+  layerPill: {
     flexDirection: 'row',
     marginHorizontal: 16,
-    padding: 6,
-    backgroundColor: 'rgba(10,15,30,0.92)',
-    borderRadius: 18,
+    padding: 8,
+    backgroundColor: 'rgba(20,26,40,0.92)',
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: GLASS_BORDER,
+    borderColor: 'rgba(255,255,255,0.10)',
     gap: 4,
   },
   layerBtn: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
     gap: 4,
-    backgroundColor: GLASS_BG,
+    backgroundColor: 'rgba(0,0,0,0.10)',
     borderColor: 'transparent',
     borderWidth: 1.5,
   },

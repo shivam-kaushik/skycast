@@ -1,10 +1,11 @@
-import React, { useRef, useImperativeHandle, forwardRef, useState } from 'react'
+import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect } from 'react'
 import { StyleSheet, View, ActivityIndicator, Text, Platform } from 'react-native'
 import WebView from 'react-native-webview'
 import type { WeatherData } from '@/src/hooks/useWeather'
 import type { AirQualityData } from '@/src/types/weather'
-
-export type MapLayer = 'precipitation' | 'temperature' | 'wind' | 'air'
+import { useOmeteoMapTileMetadata } from '@/src/hooks/useOmeteoMapTileMetadata'
+import { type MapLayer } from '@/src/components/radar/mapLayerConfig'
+export type { MapLayer } from '@/src/components/radar/mapLayerConfig'
 
 export interface WeatherMapHandle {
   play: () => void
@@ -29,11 +30,19 @@ interface OverlayData {
   feelsLike: number
 }
 
-function buildMapHTML(
+export function buildMapHTML(
   lat: number,
   lon: number,
   layer: MapLayer,
   overlay: OverlayData,
+  params: {
+    tileSourceUrl: string
+    tileValidTimesLength: number
+    cloudSourceUrl: string
+    cloudValidTimesLength: number
+    windVectorSourceUrl?: string
+    windVectorValidTimesLength?: number
+  },
 ): string {
   // Inject data as JSON — all JS inside uses var/concat to avoid TypeScript template literal conflicts
   const overlayJSON = JSON.stringify(overlay)
@@ -45,6 +54,7 @@ function buildMapHTML(
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@openmeteo/mapbox-layer@0.0.16/dist/index.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #0A0F1E; overflow: hidden; }
@@ -82,6 +92,13 @@ function buildMapHTML(
   var LON = ${lon};
   var LAYER = '${layer}';
   var OV = ${overlayJSON};
+  var TILE_SOURCE_URL = '${params.tileSourceUrl}';
+  var TILE_VALID_TIMES_COUNT = ${params.tileValidTimesLength};
+  var CLOUD_SOURCE_URL = '${params.cloudSourceUrl}';
+  var CLOUD_VALID_TIMES_COUNT = ${params.cloudValidTimesLength};
+  var WIND_VECTOR_SOURCE_URL = ${params.windVectorSourceUrl ? `'${params.windVectorSourceUrl}'` : 'null'};
+  var WIND_VECTOR_VALID_TIMES_COUNT = ${params.windVectorValidTimesLength ?? params.tileValidTimesLength};
+  var MAX_FRAMES = 8;
 
   var map = L.map('map', {
     center: [LAT, LON],
@@ -91,7 +108,7 @@ function buildMapHTML(
     preferCanvas: true
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19
   }).addTo(map);
@@ -105,16 +122,58 @@ function buildMapHTML(
   });
   L.marker([LAT, LON], { icon: pulseIcon }).addTo(map);
 
-  // ── PRECIPITATION ──────────────────────────────────────────────
-  if (LAYER === 'precipitation') {
-    var radarFrames = [];
-    var currentFrame = 0;
+  function installOmProtocol() {
+    var omModule = window.OpenMeteoMapboxLayer || window.OMWeatherMapLayer;
+    if (!omModule || !omModule.addLeafletProtocolSupport || !omModule.omProtocol) {
+      throw new Error('Open-Meteo map layer runtime missing');
+    }
+    var adapter = omModule.addLeafletProtocolSupport(L);
+    adapter.addProtocol('om', omModule.omProtocol);
+    return adapter;
+  }
+
+  function setupAnimatedOverlay() {
     var isPlaying = true;
+    var radarFrames = [];
+    var windVectorFrames = [];
+    var cloudFrames = [];
+    var currentFrame = 0;
     var animTimer = null;
+    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.36 : 0.20;
+
+    function setLayerOpacity(layer, opacity) {
+      if (!layer) return;
+      try {
+        if (typeof layer.setOpacity === 'function') {
+          layer.setOpacity(opacity)
+          return
+        }
+      } catch (_) {
+        // ignore and try container fallback
+      }
+      try {
+        if (layer._container && layer._container.style) {
+          layer._container.style.opacity = String(opacity)
+          return
+        }
+      } catch (_) {}
+      try {
+        if (layer._canvas && layer._canvas.style) {
+          layer._canvas.style.opacity = String(opacity)
+          return
+        }
+      } catch (_) {}
+    }
 
     function showFrame(idx) {
       for (var i = 0; i < radarFrames.length; i++) {
-        radarFrames[i].layer.setOpacity(i === idx ? 0.72 : 0);
+        setLayerOpacity(radarFrames[i].layer, i === idx ? 0.86 : 0);
+      }
+      for (var v = 0; v < windVectorFrames.length; v++) {
+        setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.78 : 0);
+      }
+      for (var j = 0; j < cloudFrames.length; j++) {
+        setLayerOpacity(cloudFrames[j].layer, j === idx ? cloudActiveOpacity : 0);
       }
       try {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'frame', current: idx, total: radarFrames.length }));
@@ -127,38 +186,81 @@ function buildMapHTML(
         if (!isPlaying || radarFrames.length === 0) return;
         currentFrame = (currentFrame + 1) % radarFrames.length;
         showFrame(currentFrame);
-      }, 650);
+      }, 900);
     }
 
-    fetch('https://api.rainviewer.com/public/weather-maps.json')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var host = data.host;
-        var past = data.radar && data.radar.past ? data.radar.past : [];
-        var nowcast = data.radar && data.radar.nowcast ? data.radar.nowcast.slice(0, 2) : [];
-        var allFrames = past.concat(nowcast);
-
-        for (var i = 0; i < allFrames.length; i++) {
-          var f = allFrames[i];
-          var tileLayer = L.tileLayer(host + f.path + '/256/{z}/{x}/{y}/4/1_1.png', {
-            opacity: 0,
-            tileSize: 256,
-            zIndex: 10,
-            updateWhenIdle: false,
-            updateWhenZooming: false
-          });
-          tileLayer.addTo(map);
-          radarFrames.push({ time: f.time, layer: tileLayer });
+    function buildFrameIndexes(totalCount, frameCount) {
+      if (totalCount <= 0 || frameCount <= 0) return [];
+      if (totalCount <= frameCount) {
+        var dense = [];
+        for (var i = 0; i < totalCount; i++) dense.push(i);
+        return dense;
+      }
+      var indexes = [];
+      var step = (totalCount - 1) / (frameCount - 1);
+      for (var j = 0; j < frameCount; j++) {
+        var idx = Math.round(j * step);
+        if (indexes.length === 0 || indexes[indexes.length - 1] !== idx) {
+          indexes.push(idx);
         }
+      }
+      return indexes;
+    }
 
-        if (radarFrames.length > 0) {
-          showFrame(0);
-          startAnimation();
-        }
-      })
-      .catch(function(e) {
-        try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(e) })); } catch(_) {}
+    var adapter = null;
+    try {
+      adapter = installOmProtocol();
+    } catch (e) {
+      try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(e) })); } catch(_) {}
+      return;
+    }
+
+    if (TILE_VALID_TIMES_COUNT <= 0) {
+      try {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: 'No tile frames available' }));
+      } catch (_) {}
+      return;
+    }
+
+    var frameCount = Math.min(TILE_VALID_TIMES_COUNT, MAX_FRAMES);
+    var frameIndexes = buildFrameIndexes(TILE_VALID_TIMES_COUNT, frameCount);
+
+    for (var i = 0; i < frameIndexes.length; i++) {
+      var timeIndex = frameIndexes[i];
+      var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
+      var tileLayer = adapter.createTileLayer('om://' + omUrl, {
+        opacity: i === 0 ? 0.86 : 0,
+        zIndex: 10,
       });
+      tileLayer.addTo(map);
+      radarFrames.push({ layer: tileLayer });
+    }
+
+    if (LAYER === 'wind' && WIND_VECTOR_SOURCE_URL && WIND_VECTOR_VALID_TIMES_COUNT > 0) {
+      for (var k = 0; k < frameIndexes.length; k++) {
+        var vectorTimeIndex = Math.min(frameIndexes[k], WIND_VECTOR_VALID_TIMES_COUNT - 1);
+        var vecOmUrl = WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
+        var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, { opacity: k === 0 ? 0.78 : 0, zIndex: 11 });
+        vectorLayer.addTo(map);
+        windVectorFrames.push({ layer: vectorLayer });
+      }
+    }
+
+    if (CLOUD_VALID_TIMES_COUNT > 0) {
+      for (var j = 0; j < frameIndexes.length; j++) {
+        var cloudTimeIndex = Math.min(frameIndexes[j], CLOUD_VALID_TIMES_COUNT - 1);
+        var omCloudUrl = CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
+        var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
+          opacity: j === 0 ? cloudActiveOpacity : 0,
+          zIndex: 9,
+        });
+        cloudLayer.addTo(map);
+        cloudFrames.push({ layer: cloudLayer });
+      }
+    }
+
+    showFrame(0);
+    startAnimation();
 
     document.addEventListener('message', function(e) {
       try {
@@ -174,6 +276,11 @@ function buildMapHTML(
         if (msg.type === 'pause') { isPlaying = false; }
       } catch(_) {}
     });
+  }
+
+  // ── ANIMATED WEATHER LAYERS ────────────────────────────────────
+  if (LAYER === 'precipitation' || LAYER === 'temperature' || LAYER === 'wind' || LAYER === 'air') {
+    setupAnimatedOverlay();
   }
 
   // ── TEMPERATURE ────────────────────────────────────────────────
@@ -264,6 +371,17 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
   const [mapError, setMapError] = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
 
+  const {
+    data: tileMeta,
+    isLoading: tileMetaLoading,
+    isError: tileMetaError,
+  } = useOmeteoMapTileMetadata(layer)
+
+  useEffect(() => {
+    setMapError(false)
+    setMapLoading(true)
+  }, [lat, lon, layer])
+
   useImperativeHandle(ref, () => ({
     play() {
       webViewRef.current?.injectJavaScript(
@@ -286,7 +404,29 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     feelsLike: weather.current.apparentTemperature,
   }
 
-  const html = buildMapHTML(lat, lon, layer, overlay)
+  if (tileMetaLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator color="#4A9EFF" size="large" />
+          <Text style={styles.loadingLabel}>Loading map…</Text>
+        </View>
+      </View>
+    )
+  }
+
+  if (tileMetaError || !tileMeta) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.errorLabel}>Map unavailable</Text>
+          <Text style={styles.errorSub}>Check internet connection</Text>
+        </View>
+      </View>
+    )
+  }
+
+  const html = buildMapHTML(lat, lon, layer, overlay, tileMeta)
 
   // baseUrl must be a real HTTPS origin so Android WebView allows CDN requests
   const baseUrl = Platform.OS === 'android'
@@ -324,7 +464,10 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         startInLoadingState={false}
-        onLoadEnd={() => setMapLoading(false)}
+        onLoadEnd={() => {
+          setMapLoading(false)
+          setMapError(false)
+        }}
         onError={() => { setMapLoading(false); setMapError(true) }}
         onHttpError={() => { setMapLoading(false); setMapError(true) }}
         onMessage={(event) => {
@@ -336,6 +479,11 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
             }
             if (msg.type === 'frame' && msg.current !== undefined && msg.total !== undefined) {
               onFrameUpdate(msg.current, msg.total)
+            }
+            if (msg.type === 'error') {
+              setMapLoading(false)
+              setMapError(true)
+              onFrameUpdate(0, 0)
             }
           } catch (_) {
             // ignore
