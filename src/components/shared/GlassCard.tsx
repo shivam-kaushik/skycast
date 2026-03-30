@@ -1,11 +1,11 @@
 import React from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
-import type { ViewStyle } from 'react-native'
+import type { StyleProp, ViewStyle } from 'react-native'
 import { GLASS_BG, GLASS_BORDER } from '@/src/theme/colors'
 
 interface GlassCardProps {
   children: React.ReactNode
-  style?: ViewStyle
+  style?: StyleProp<ViewStyle>
   onPress?: () => void
 }
 

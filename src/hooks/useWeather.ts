@@ -7,50 +7,19 @@ const STALE_TIME = 5 * 60 * 1000
 const REFETCH_INTERVAL = 10 * 60 * 1000
 const RETRY = 2
 
-export function useCurrentWeather(
-  lat: number | null,
-  lon: number | null,
-): UseQueryResult<CurrentWeather> {
-  return useQuery<CurrentWeather>({
-    queryKey: ['weather', lat, lon],
-    queryFn: async () => {
-      const data = await fetchWeather(lat!, lon!)
-      return data.current
-    },
-    enabled: lat !== null && lon !== null,
-    staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
-    retry: RETRY,
-  })
+export interface WeatherData {
+  current: CurrentWeather
+  hourly: HourlyWeather
+  daily: DailyWeather
 }
 
-export function useHourlyForecast(
+export function useWeather(
   lat: number | null,
   lon: number | null,
-): UseQueryResult<HourlyWeather> {
-  return useQuery<HourlyWeather>({
+): UseQueryResult<WeatherData> {
+  return useQuery<WeatherData>({
     queryKey: ['weather', lat, lon],
-    queryFn: async () => {
-      const data = await fetchWeather(lat!, lon!)
-      return data.hourly
-    },
-    enabled: lat !== null && lon !== null,
-    staleTime: STALE_TIME,
-    refetchInterval: REFETCH_INTERVAL,
-    retry: RETRY,
-  })
-}
-
-export function useDailyForecast(
-  lat: number | null,
-  lon: number | null,
-): UseQueryResult<DailyWeather> {
-  return useQuery<DailyWeather>({
-    queryKey: ['weather', lat, lon],
-    queryFn: async () => {
-      const data = await fetchWeather(lat!, lon!)
-      return data.daily
-    },
+    queryFn: () => fetchWeather(lat!, lon!),
     enabled: lat !== null && lon !== null,
     staleTime: STALE_TIME,
     refetchInterval: REFETCH_INTERVAL,
