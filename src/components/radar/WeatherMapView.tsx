@@ -54,7 +54,7 @@ export function buildMapHTML(
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/@openmeteo/mapbox-layer@0.0.16/dist/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@openmeteo/mapbox-layer@0.0.16/dist/index.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #0A0F1E; overflow: hidden; }
@@ -108,9 +108,20 @@ export function buildMapHTML(
     preferCanvas: true
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  // Panes (control z-order deterministically)
+  map.createPane('basePane');
+  map.getPane('basePane').style.zIndex = 200;
+  map.createPane('cloudPane');
+  map.getPane('cloudPane').style.zIndex = 310;
+  map.createPane('dataPane');
+  map.getPane('dataPane').style.zIndex = 320;
+  map.createPane('vectorPane');
+  map.getPane('vectorPane').style.zIndex = 330;
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
-    maxZoom: 19
+    maxZoom: 19,
+    pane: 'basePane'
   }).addTo(map);
 
   // Pulsing location dot
@@ -167,10 +178,10 @@ export function buildMapHTML(
 
     function showFrame(idx) {
       for (var i = 0; i < radarFrames.length; i++) {
-        setLayerOpacity(radarFrames[i].layer, i === idx ? 0.86 : 0);
+        setLayerOpacity(radarFrames[i].layer, i === idx ? 0.92 : 0);
       }
       for (var v = 0; v < windVectorFrames.length; v++) {
-        setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.78 : 0);
+        setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.88 : 0);
       }
       for (var j = 0; j < cloudFrames.length; j++) {
         setLayerOpacity(cloudFrames[j].layer, j === idx ? cloudActiveOpacity : 0);
@@ -186,7 +197,7 @@ export function buildMapHTML(
         if (!isPlaying || radarFrames.length === 0) return;
         currentFrame = (currentFrame + 1) % radarFrames.length;
         showFrame(currentFrame);
-      }, 900);
+      }, 650);
     }
 
     function buildFrameIndexes(totalCount, frameCount) {
@@ -229,10 +240,12 @@ export function buildMapHTML(
       var timeIndex = frameIndexes[i];
       var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
-        opacity: i === 0 ? 0.86 : 0,
+        opacity: i === 0 ? 0.92 : 0,
         zIndex: 10,
+        pane: 'dataPane',
       });
       tileLayer.addTo(map);
+      try { if (typeof tileLayer.setZIndex === 'function') tileLayer.setZIndex(320); } catch (_) {}
       radarFrames.push({ layer: tileLayer });
     }
 
@@ -240,8 +253,34 @@ export function buildMapHTML(
       for (var k = 0; k < frameIndexes.length; k++) {
         var vectorTimeIndex = Math.min(frameIndexes[k], WIND_VECTOR_VALID_TIMES_COUNT - 1);
         var vecOmUrl = WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
-        var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, { opacity: k === 0 ? 0.78 : 0, zIndex: 11 });
+        var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, {
+          opacity: k === 0 ? 0.88 : 0,
+          zIndex: 11,
+          pane: 'vectorPane',
+          style: function(properties, layerName) {
+            // Different builds can expose different source-layer names
+            // (e.g. "wind-arrows", "wind_arrows", "arrows"). Style all
+            // line-like wind layers and keep others hidden.
+            var ln = String(layerName || '').toLowerCase();
+            var looksLikeWind =
+              ln.indexOf('wind') >= 0 ||
+              ln.indexOf('arrow') >= 0 ||
+              ln.indexOf('vector') >= 0;
+            if (!looksLikeWind) return null;
+            var raw = properties && properties.value !== undefined ? properties.value : 0;
+            var val = Number(raw);
+            if (!isFinite(val)) val = 0;
+            var alpha = val > 5 ? 0.92 : val > 4 ? 0.84 : val > 3 ? 0.76 : val > 2 ? 0.66 : 0.54;
+            return {
+              strokeStyle: 'rgba(35, 185, 161,' + alpha + ')',
+              lineWidth: 2.4,
+              lineCap: 'round',
+              globalAlpha: 1
+            };
+          }
+        });
         vectorLayer.addTo(map);
+        try { if (typeof vectorLayer.setZIndex === 'function') vectorLayer.setZIndex(330); } catch (_) {}
         windVectorFrames.push({ layer: vectorLayer });
       }
     }
@@ -253,8 +292,10 @@ export function buildMapHTML(
         var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
           opacity: j === 0 ? cloudActiveOpacity : 0,
           zIndex: 9,
+          pane: 'cloudPane',
         });
         cloudLayer.addTo(map);
+        try { if (typeof cloudLayer.setZIndex === 'function') cloudLayer.setZIndex(310); } catch (_) {}
         cloudFrames.push({ layer: cloudLayer });
       }
     }
@@ -279,9 +320,20 @@ export function buildMapHTML(
   }
 
   // ── ANIMATED WEATHER LAYERS ────────────────────────────────────
-  if (LAYER === 'precipitation' || LAYER === 'temperature' || LAYER === 'wind' || LAYER === 'air') {
+  if (LAYER === 'temperature' || LAYER === 'wind' || LAYER === 'air') {
     setupAnimatedOverlay();
   }
+
+  // Surface JS/runtime errors back to React Native (avoid silent failures)
+  window.onerror = function(message, source, lineno, colno, error) {
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'error',
+        msg: String(message || (error && error.message) || 'Unknown WebView error')
+      }));
+    } catch (_) {}
+    return false;
+  };
 
   // ── TEMPERATURE ────────────────────────────────────────────────
   if (LAYER === 'temperature') {
@@ -365,17 +417,163 @@ export function buildMapHTML(
 </html>`
 }
 
+export function buildPrecipitationHTML(lat: number, lon: number): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #0A0F1E; overflow: hidden; }
+    #map { width: 100%; height: 100%; }
+    .leaflet-control-zoom { display: none !important; }
+    .leaflet-control-attribution { display: none !important; }
+    .leaflet-bar { display: none !important; }
+    .pulse-ring {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: rgba(74,158,255,0.4);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%   { transform: scale(1);   opacity: 0.8; }
+      50%  { transform: scale(2.2); opacity: 0;   }
+      100% { transform: scale(1);   opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  var LAT = ${lat};
+  var LON = ${lon};
+
+  var map = L.map('map', {
+    center: [LAT, LON],
+    zoom: 8,
+    zoomControl: false,
+    attributionControl: false,
+    preferCanvas: true
+  });
+
+  map.createPane('basePane');
+  map.getPane('basePane').style.zIndex = 200;
+  map.createPane('dataPane');
+  map.getPane('dataPane').style.zIndex = 320;
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    pane: 'basePane'
+  }).addTo(map);
+
+  var pulseIcon = L.divIcon({
+    className: '',
+    html: '<div style="position:relative;width:20px;height:20px;"><div class="pulse-ring" style="position:absolute;top:0;left:0;"></div><div style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#4A9EFF;border:2px solid #fff;"></div></div>',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+  });
+  L.marker([LAT, LON], { icon: pulseIcon }).addTo(map);
+
+  window.onerror = function(message, source, lineno, colno, error) {
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'error',
+        msg: String(message || (error && error.message) || 'Unknown WebView error')
+      }));
+    } catch (_) {}
+    return false;
+  };
+
+  var tileLayers = [];
+  var currentFrame = 0;
+  var isPlaying = true;
+  var animTimer = null;
+
+  function showFrame(idx) {
+    for (var i = 0; i < tileLayers.length; i++) {
+      tileLayers[i].setOpacity(i === idx ? 0.85 : 0);
+    }
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'frame', current: idx, total: tileLayers.length }));
+    } catch(e) {}
+  }
+
+  function startAnimation() {
+    if (animTimer) clearInterval(animTimer);
+    animTimer = setInterval(function() {
+      if (!isPlaying || tileLayers.length === 0) return;
+      currentFrame = (currentFrame + 1) % tileLayers.length;
+      showFrame(currentFrame);
+    }, 650);
+  }
+
+  function handleMessage(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      if (msg.type === 'play') { isPlaying = true; }
+      if (msg.type === 'pause') { isPlaying = false; }
+    } catch(_) {}
+  }
+
+  window.addEventListener('message', handleMessage);
+  document.addEventListener('message', handleMessage);
+
+  fetch('https://api.rainviewer.com/public/weather-maps.json')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var host = data.host;
+      var past = data.radar && data.radar.past ? data.radar.past : [];
+      var nowcast = data.radar && data.radar.nowcast ? data.radar.nowcast : [];
+
+      var pastFrames = past.slice(-6);
+      var nowcastFrames = nowcast.slice(0, 4);
+      var frames = pastFrames.concat(nowcastFrames);
+
+      for (var i = 0; i < frames.length; i++) {
+        var frame = frames[i];
+        var url = host + frame.path + '/512/{z}/{x}/{y}/6/1_1.png';
+        var tileLayer = L.tileLayer(url, {
+          tileSize: 512,
+          zoomOffset: -1,
+          opacity: i === 0 ? 0.85 : 0,
+          pane: 'dataPane'
+        });
+        tileLayer.addTo(map);
+        tileLayers.push(tileLayer);
+      }
+
+      if (tileLayers.length > 0) {
+        showFrame(0);
+        startAnimation();
+      }
+    })
+    .catch(function(e) {
+      try {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(e) }));
+      } catch(_) {}
+    });
+</script>
+</body>
+</html>`
+}
+
 const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props, ref) => {
   const { lat, lon, layer, weather, airQuality, onFrameUpdate } = props
   const webViewRef = useRef<WebView>(null)
   const [mapError, setMapError] = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
 
+  const isPrecip = layer === 'precipitation'
+
   const {
     data: tileMeta,
     isLoading: tileMetaLoading,
     isError: tileMetaError,
-  } = useOmeteoMapTileMetadata(layer)
+  } = useOmeteoMapTileMetadata(layer, { enabled: !isPrecip })
 
   useEffect(() => {
     setMapError(false)
@@ -404,7 +602,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     feelsLike: weather.current.apparentTemperature,
   }
 
-  if (tileMetaLoading) {
+  if (!isPrecip && tileMetaLoading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingOverlay}>
@@ -415,7 +613,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     )
   }
 
-  if (tileMetaError || !tileMeta) {
+  if (!isPrecip && (tileMetaError || !tileMeta)) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingOverlay}>
@@ -426,7 +624,9 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     )
   }
 
-  const html = buildMapHTML(lat, lon, layer, overlay, tileMeta)
+  const html = isPrecip
+    ? buildPrecipitationHTML(lat, lon)
+    : buildMapHTML(lat, lon, layer, overlay, tileMeta!)
 
   // baseUrl must be a real HTTPS origin so Android WebView allows CDN requests
   const baseUrl = Platform.OS === 'android'

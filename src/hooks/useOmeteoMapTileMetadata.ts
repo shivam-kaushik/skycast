@@ -53,10 +53,10 @@ function deriveWindVectorSourceUrl(rasterSourceUrl: string): string {
   return windVectorSourceUrl
 }
 
-export function useOmeteoMapTileMetadata(layer: MapLayer) {
+export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: boolean }) {
   return useQuery<OmeteoTileMetadata | null>({
     queryKey: ['omTileMeta', layer],
-    enabled: true,
+    enabled: options?.enabled ?? true,
     staleTime: STALE_TIME,
     refetchInterval: REFETCH_INTERVAL,
     retry: RETRY,
