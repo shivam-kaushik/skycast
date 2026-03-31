@@ -111,6 +111,8 @@ export function buildMapHTML(
   // Panes (control z-order deterministically)
   map.createPane('basePane');
   map.getPane('basePane').style.zIndex = 200;
+  map.createPane('labelPane');
+  map.getPane('labelPane').style.zIndex = 340;
   map.createPane('cloudPane');
   map.getPane('cloudPane').style.zIndex = 310;
   map.createPane('dataPane');
@@ -118,10 +120,17 @@ export function buildMapHTML(
   map.createPane('vectorPane');
   map.getPane('vectorPane').style.zIndex = 330;
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
     pane: 'basePane'
+  }).addTo(map);
+  // Keep place names and boundaries visible regardless of weather overlay.
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    opacity: 0.92,
+    pane: 'labelPane',
   }).addTo(map);
 
   // Pulsing location dot
@@ -150,7 +159,7 @@ export function buildMapHTML(
     var cloudFrames = [];
     var currentFrame = 0;
     var animTimer = null;
-    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.36 : 0.20;
+    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.22 : 0;
 
     function setLayerOpacity(layer, opacity) {
       if (!layer) return;
@@ -178,7 +187,7 @@ export function buildMapHTML(
 
     function showFrame(idx) {
       for (var i = 0; i < radarFrames.length; i++) {
-        setLayerOpacity(radarFrames[i].layer, i === idx ? (LAYER === 'wind' ? 0.42 : 0.78) : 0);
+        setLayerOpacity(radarFrames[i].layer, i === idx ? (LAYER === 'wind' ? 0.56 : 0.66) : 0);
       }
       for (var v = 0; v < windVectorFrames.length; v++) {
         setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.9 : 0);
@@ -240,7 +249,7 @@ export function buildMapHTML(
       var timeIndex = frameIndexes[i];
       var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
-        opacity: i === 0 ? (LAYER === 'wind' ? 0.42 : 0.78) : 0,
+        opacity: i === 0 ? (LAYER === 'wind' ? 0.56 : 0.66) : 0,
         zIndex: 10,
         pane: 'dataPane',
       });
@@ -285,7 +294,7 @@ export function buildMapHTML(
       }
     }
 
-    if (CLOUD_VALID_TIMES_COUNT > 0) {
+    if (CLOUD_VALID_TIMES_COUNT > 0 && cloudActiveOpacity > 0) {
       for (var j = 0; j < frameIndexes.length; j++) {
         var cloudTimeIndex = Math.min(frameIndexes[j], CLOUD_VALID_TIMES_COUNT - 1);
         var omCloudUrl = CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
@@ -461,13 +470,21 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
 
   map.createPane('basePane');
   map.getPane('basePane').style.zIndex = 200;
+  map.createPane('labelPane');
+  map.getPane('labelPane').style.zIndex = 340;
   map.createPane('dataPane');
   map.getPane('dataPane').style.zIndex = 320;
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
     pane: 'basePane'
+  }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    opacity: 0.92,
+    pane: 'labelPane',
   }).addTo(map);
 
   var pulseIcon = L.divIcon({
