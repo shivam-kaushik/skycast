@@ -187,7 +187,8 @@ export function buildMapHTML(
 
     function showFrame(idx) {
       for (var i = 0; i < radarFrames.length; i++) {
-        setLayerOpacity(radarFrames[i].layer, i === idx ? (LAYER === 'wind' ? 0.56 : 0.66) : 0);
+        var activeOpacity = LAYER === 'wind' ? 0.56 : (LAYER === 'temperature' ? 0.86 : 0.66);
+        setLayerOpacity(radarFrames[i].layer, i === idx ? activeOpacity : 0);
       }
       for (var v = 0; v < windVectorFrames.length; v++) {
         setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.9 : 0);
@@ -249,7 +250,7 @@ export function buildMapHTML(
       var timeIndex = frameIndexes[i];
       var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
-        opacity: i === 0 ? (LAYER === 'wind' ? 0.56 : 0.66) : 0,
+        opacity: i === 0 ? (LAYER === 'wind' ? 0.56 : (LAYER === 'temperature' ? 0.86 : 0.66)) : 0,
         zIndex: 10,
         pane: 'dataPane',
       });
@@ -348,11 +349,6 @@ export function buildMapHTML(
   if (LAYER === 'temperature') {
     var temp = OV.temperature;
     var color = temp > 38 ? '#FF3B30' : temp > 30 ? '#FF6B6B' : temp > 22 ? '#FFD166' : temp > 12 ? '#06D6A0' : temp > 2 ? '#4A9EFF' : '#A78BFA';
-
-    // Outer glow
-    L.circle([LAT, LON], { radius: 60000, fillColor: color, fillOpacity: 0.07, color: color, weight: 0 }).addTo(map);
-    L.circle([LAT, LON], { radius: 25000, fillColor: color, fillOpacity: 0.14, color: color, weight: 0 }).addTo(map);
-    L.circle([LAT, LON], { radius: 6000,  fillColor: color, fillOpacity: 0.28, color: color, weight: 1, opacity: 0.5 }).addTo(map);
 
     var tempLabel = L.divIcon({
       className: '',

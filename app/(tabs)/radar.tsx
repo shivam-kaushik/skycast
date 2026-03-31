@@ -79,6 +79,7 @@ export default function RadarScreen() {
   const [isPlaying, setIsPlaying] = useState(true)
   const [frameIndex, setFrameIndex] = useState(0)
   const [totalFrames, setTotalFrames] = useState(0)
+  const [range, setRange] = useState<'1h' | '12h'>('12h')
 
   const mapRef = useRef<WeatherMapHandle>(null)
 
@@ -104,6 +105,9 @@ export default function RadarScreen() {
     setTotalFrames(0)
     setIsPlaying(true)
   }, [activeLayer, lat, lon])
+
+  const currentOffsetHours =
+    totalFrames > 1 ? Math.round((frameIndex / (totalFrames - 1)) * (range === '1h' ? 1 : 12)) : 0
 
   if (isLoading || !weather) {
     return (
@@ -161,7 +165,7 @@ export default function RadarScreen() {
 
       {/* Bottom overlay: layer selector + animation controls */}
       <View style={styles.bottomOverlay} pointerEvents="box-none">
-        {/* Animation controls (precipitation only) */}
+        {/* Animation controls */}
         {totalFrames > 0 && (
           <View style={styles.animationPill} pointerEvents="auto">
             <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
@@ -183,8 +187,46 @@ export default function RadarScreen() {
                 />
               ))}
             </View>
-            <View style={styles.forecastBadge}>
-              <Text style={styles.forecastText}>FORECAST</Text>
+            <View style={styles.timelineMeta}>
+              <View style={styles.rangeToggle}>
+                <Pressable
+                  style={[
+                    styles.rangeChip,
+                    range === '1h' && styles.rangeChipActive,
+                  ]}
+                  onPress={() => setRange('1h')}
+                >
+                  <Text
+                    style={[
+                      styles.rangeChipLabel,
+                      range === '1h' && styles.rangeChipLabelActive,
+                    ]}
+                  >
+                    1h
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.rangeChip,
+                    range === '12h' && styles.rangeChipActive,
+                  ]}
+                  onPress={() => setRange('12h')}
+                >
+                  <Text
+                    style={[
+                      styles.rangeChipLabel,
+                      range === '12h' && styles.rangeChipLabelActive,
+                    ]}
+                  >
+                    12h
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={styles.forecastBadge}>
+                <Text style={styles.forecastText}>
+                  {currentOffsetHours === 0 ? 'Now' : `+${currentOffsetHours}h`}
+                </Text>
+              </View>
             </View>
           </View>
         )}
@@ -354,6 +396,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: ACCENT,
     letterSpacing: 0.5,
+  },
+  timelineMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rangeToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.14)',
+    borderRadius: 999,
+    padding: 2,
+  },
+  rangeChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  rangeChipActive: {
+    backgroundColor: 'rgba(74,158,255,0.26)',
+  },
+  rangeChipLabel: {
+    fontSize: 11,
+    color: TEXT_TERTIARY,
+    fontWeight: '600',
+  },
+  rangeChipLabelActive: {
+    color: ACCENT,
   },
   // Layer selector
   layerPill: {
