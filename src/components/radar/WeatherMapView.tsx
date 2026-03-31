@@ -118,7 +118,7 @@ export function buildMapHTML(
   map.createPane('vectorPane');
   map.getPane('vectorPane').style.zIndex = 330;
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
     pane: 'basePane'
@@ -178,10 +178,10 @@ export function buildMapHTML(
 
     function showFrame(idx) {
       for (var i = 0; i < radarFrames.length; i++) {
-        setLayerOpacity(radarFrames[i].layer, i === idx ? 0.92 : 0);
+        setLayerOpacity(radarFrames[i].layer, i === idx ? (LAYER === 'wind' ? 0.42 : 0.78) : 0);
       }
       for (var v = 0; v < windVectorFrames.length; v++) {
-        setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.88 : 0);
+        setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.9 : 0);
       }
       for (var j = 0; j < cloudFrames.length; j++) {
         setLayerOpacity(cloudFrames[j].layer, j === idx ? cloudActiveOpacity : 0);
@@ -240,7 +240,7 @@ export function buildMapHTML(
       var timeIndex = frameIndexes[i];
       var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
-        opacity: i === 0 ? 0.92 : 0,
+        opacity: i === 0 ? (LAYER === 'wind' ? 0.42 : 0.78) : 0,
         zIndex: 10,
         pane: 'dataPane',
       });
