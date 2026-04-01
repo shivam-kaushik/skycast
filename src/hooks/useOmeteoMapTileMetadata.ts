@@ -12,31 +12,67 @@ type TileMetadataJson = {
 type OmeteoTileMetadata = {
   tileSourceUrl: string
   tileValidTimesLength: number
+  /** ISO timestamps from Open-Meteo `valid_times` (same order as tile time_step indices) */
+  validTimes: string[]
   cloudSourceUrl: string
   cloudValidTimesLength: number
   windVectorSourceUrl?: string
   windVectorValidTimesLength?: number
 }
 
-function getValidTimesLength(json: TileMetadataJson): number {
+/** Normalize API values to ISO 8601 strings (handles Unix seconds / ms and numeric strings). */
+function validTimeToIso(x: unknown): string {
+  if (typeof x === 'number' && Number.isFinite(x)) {
+    const ms = x > 1e12 ? x : x * 1000
+    return new Date(ms).toISOString()
+  }
+  if (typeof x === 'string') {
+    const t = x.trim()
+    if (!t) return ''
+    if (/^-?\d+(\.\d+)?$/.test(t)) {
+      const n = Number(t)
+      if (!Number.isFinite(n)) return t
+      const ms = n > 1e12 ? n : n * 1000
+      return new Date(ms).toISOString()
+    }
+    return t
+  }
+  return ''
+}
+
+function parseValidTimes(json: TileMetadataJson): string[] {
   const v = json.valid_times
-  if (!Array.isArray(v)) return 0
-  return v.length
+  if (!Array.isArray(v)) return []
+  return v.map((x) => {
+    const iso = validTimeToIso(x)
+    if (iso) return iso
+    return typeof x === 'string' ? x : ''
+  })
+}
+
+function getValidTimesLength(json: TileMetadataJson): number {
+  return parseValidTimes(json).length
+}
+
+async function fetchValidTimes(url: string): Promise<string[]> {
+  const res = await fetch(url)
+  if (!res.ok) return []
+  const json = (await res.json()) as TileMetadataJson
+  return parseValidTimes(json)
 }
 
 async function fetchValidTimesLength(url: string): Promise<number> {
-  const res = await fetch(url)
-  if (!res.ok) return 0
-  const json = (await res.json()) as TileMetadataJson
-  return getValidTimesLength(json)
+  const times = await fetchValidTimes(url)
+  return times.length
 }
 
-async function selectFirstNonEmptySource(urls: string[]): Promise<{ url: string; length: number } | null> {
-  // Sequential to keep logic simple and avoid unnecessary concurrent load.
+async function selectFirstNonEmptySource(
+  urls: string[],
+): Promise<{ url: string; length: number; validTimes: string[] } | null> {
   for (const url of urls) {
     try {
-      const length = await fetchValidTimesLength(url)
-      if (length > 0) return { url, length }
+      const validTimes = await fetchValidTimes(url)
+      if (validTimes.length > 0) return { url, length: validTimes.length, validTimes }
     } catch (_) {
       // ignore and try next source
     }
@@ -78,6 +114,7 @@ export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: 
         return {
           tileSourceUrl: selectedTile.url,
           tileValidTimesLength: selectedTile.length,
+          validTimes: selectedTile.validTimes,
           cloudSourceUrl: selectedCloud.url,
           cloudValidTimesLength: selectedCloud.length,
           windVectorSourceUrl,
@@ -88,6 +125,7 @@ export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: 
       return {
         tileSourceUrl: selectedTile.url,
         tileValidTimesLength: selectedTile.length,
+        validTimes: selectedTile.validTimes,
         cloudSourceUrl: selectedCloud.url,
         cloudValidTimesLength: selectedCloud.length,
       }

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
-import { GLASS_BG, GLASS_BORDER } from '@/src/theme/colors'
+import { GLASS_BG, GHOST_BORDER } from '@/src/theme/colors'
 
 interface GlassCardProps {
   children: React.ReactNode
@@ -24,8 +24,8 @@ export default function GlassCard({ children, style, onPress }: GlassCardProps) 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: GLASS_BG,
-    borderColor: GLASS_BORDER,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderColor: GHOST_BORDER,
+    borderRadius: 24,
+    borderWidth: 1.5,
   },
 })

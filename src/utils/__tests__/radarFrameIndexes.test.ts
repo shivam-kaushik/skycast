@@ -1,0 +1,60 @@
+import {
+  buildDisplayFrameApiIndices,
+  filterApiIndicesWithinHoursBeforeLatest,
+  subsampleChronologicalApiIndices,
+} from '@/src/utils/radarFrameIndexes'
+
+describe('filterApiIndicesWithinHoursBeforeLatest', () => {
+  it('keeps only instants within 1h before the latest time', () => {
+    const base = Date.parse('2026-04-01T12:00:00.000Z')
+    const validTimes = [
+      new Date(base - 3 * 3600000).toISOString(),
+      new Date(base - 2 * 3600000).toISOString(),
+      new Date(base - 90 * 60000).toISOString(),
+      new Date(base - 30 * 60000).toISOString(),
+      new Date(base).toISOString(),
+    ]
+    const idx = filterApiIndicesWithinHoursBeforeLatest(validTimes, 1)
+    // 90m before latest is outside the last 60m; keep 30m + now
+    expect(idx).toEqual([3, 4])
+  })
+
+  it('includes full chronological span for 12h when all fit', () => {
+    const base = Date.parse('2026-04-01T12:00:00.000Z')
+    const validTimes = [
+      new Date(base - 10 * 3600000).toISOString(),
+      new Date(base - 5 * 3600000).toISOString(),
+      new Date(base).toISOString(),
+    ]
+    const idx = filterApiIndicesWithinHoursBeforeLatest(validTimes, 12)
+    expect(idx).toEqual([0, 1, 2])
+  })
+})
+
+describe('subsampleChronologicalApiIndices', () => {
+  it('returns all when under max', () => {
+    expect(subsampleChronologicalApiIndices([1, 2, 3], 8)).toEqual([1, 2, 3])
+  })
+
+  it('subsamples evenly', () => {
+    const arr = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    const out = subsampleChronologicalApiIndices(arr, 3)
+    expect(out.length).toBe(3)
+    expect(out[0]).toBe(0)
+    expect(out[out.length - 1]).toBe(9)
+  })
+})
+
+describe('buildDisplayFrameApiIndices', () => {
+  it('combines filter and subsample', () => {
+    const base = Date.parse('2026-04-01T18:00:00.000Z')
+    const validTimes = Array.from({ length: 24 }, (_, i) =>
+      new Date(base - (23 - i) * 3600000).toISOString(),
+    )
+    const one = buildDisplayFrameApiIndices(validTimes, 1, 4)
+    expect(one.length).toBeLessThanOrEqual(4)
+    const twelve = buildDisplayFrameApiIndices(validTimes, 12, 8)
+    expect(twelve.length).toBeLessThanOrEqual(8)
+    expect(new Set(twelve).size).toBe(twelve.length)
+  })
+})

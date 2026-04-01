@@ -1,5 +1,5 @@
 import type { HourlyWeather, DailyWeather, ActivityScore } from '@/src/types/weather'
-import { GOOD, WARNING, DANGER, ACCENT } from '@/src/theme/colors'
+import { GOOD, WARNING, DANGER } from '@/src/theme/colors'
 
 // ─── Scoring helpers ──────────────────────────────────────────────────────────
 

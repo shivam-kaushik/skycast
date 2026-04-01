@@ -8,9 +8,11 @@ import {
   TouchableOpacity,
   Pressable,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import type { ComponentProps } from 'react'
+import { format } from 'date-fns'
+import { parseTimelineInstant } from '@/src/utils/timelineInstant'
 import { useLocationStore } from '@/src/store/locationStore'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
@@ -18,6 +20,7 @@ import { useLocation } from '@/src/hooks/useLocation'
 import WeatherMapView from '@/src/components/radar/WeatherMapView'
 import type { MapLayer, WeatherMapHandle } from '@/src/components/radar/WeatherMapView'
 import RadarLegend from '@/src/components/radar/RadarLegend'
+import RadarTimeScrubber from '@/src/components/radar/RadarTimeScrubber'
 import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 import {
   BG,
@@ -25,11 +28,21 @@ import {
   TEXT_SECONDARY,
   TEXT_TERTIARY,
   ACCENT,
+  ACCENT_SOFT,
+  GHOST_BORDER,
   GLASS_BG,
-  GLASS_BORDER,
+  SECONDARY,
 } from '@/src/theme/colors'
+import { FONT_BOLD, FONT_MEDIUM } from '@/src/theme/typography'
 
 type IoniconName = ComponentProps<typeof Ionicons>['name']
+
+/** Space above the floating tab bar so layer + timeline are not obscured */
+const TAB_BAR_CLEARANCE = 92
+
+/** Navy glass floater: readable on light map basemaps, aligned with Stitch surfaces (#1a1f2f) */
+const RADAR_FLOAT_SURFACE = 'rgba(26, 31, 47, 0.93)'
+const RADAR_FLOAT_BORDER = 'rgba(222, 225, 247, 0.16)'
 
 interface LayerConfig {
   key: MapLayer
@@ -44,14 +57,14 @@ const LAYERS: LayerConfig[] = [
     key: 'precipitation',
     label: 'Radar',
     icon: 'rainy-outline',
-    color: '#4A9EFF',
+    color: SECONDARY,
     description: 'Live animated radar',
   },
   {
     key: 'temperature',
     label: 'Temp',
     icon: 'thermometer-outline',
-    color: '#FF6B6B',
+    color: ACCENT_SOFT,
     description: 'Current temperature',
   },
   {
@@ -70,8 +83,16 @@ const LAYERS: LayerConfig[] = [
   },
 ]
 
+function formatHeroTime(iso: string | null): string {
+  if (!iso) return '—'
+  const d = parseTimelineInstant(iso)
+  if (!d) return '—'
+  return format(d, 'EEE h:mm a')
+}
+
 export default function RadarScreen() {
   useLocation()
+  const insets = useSafeAreaInsets()
   const { lat, lon, cityName, deviceCityName, savedLocations, recentLocationIds } =
     useLocationStore()
   const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
@@ -86,12 +107,22 @@ export default function RadarScreen() {
   const [totalFrames, setTotalFrames] = useState(0)
   const [range, setRange] = useState<'1h' | '12h'>('12h')
   const [isPickerOpen, setPickerOpen] = useState(false)
+  const [frameTimes, setFrameTimes] = useState<string[]>([])
+  const [currentTimeIso, setCurrentTimeIso] = useState<string | null>(null)
 
   const mapRef = useRef<WeatherMapHandle>(null)
 
-  const handleFrameUpdate = useCallback((current: number, total: number) => {
-    setFrameIndex(current)
-    setTotalFrames(total)
+  const handleFrameUpdate = useCallback(
+    (current: number, total: number, timeISO: string | null) => {
+      setFrameIndex(current)
+      setTotalFrames(total)
+      setCurrentTimeIso(timeISO)
+    },
+    [],
+  )
+
+  const handleTimelineReady = useCallback((times: string[]) => {
+    setFrameTimes(times)
   }, [])
 
   const togglePlayPause = () => {
@@ -104,13 +135,21 @@ export default function RadarScreen() {
     }
   }
 
+  const onSelectFrame = (index: number) => {
+    mapRef.current?.seekToFrame(index)
+    mapRef.current?.pause()
+    setIsPlaying(false)
+  }
+
   const isLoading = weatherLoading || aqLoading
 
   useEffect(() => {
     setFrameIndex(0)
     setTotalFrames(0)
+    setFrameTimes([])
+    setCurrentTimeIso(null)
     setIsPlaying(true)
-  }, [activeLayer, lat, lon])
+  }, [activeLayer, lat, lon, range])
 
   const currentOffsetHours =
     totalFrames > 1 ? Math.round((frameIndex / (totalFrames - 1)) * (range === '1h' ? 1 : 12)) : 0
@@ -136,12 +175,12 @@ export default function RadarScreen() {
   }
 
   const activeConfig = LAYERS.find((l) => l.key === activeLayer) ?? LAYERS[0]!
+  const bottomPad = insets.bottom + TAB_BAR_CLEARANCE
 
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Map — full screen */}
       <WeatherMapView
         ref={mapRef}
         lat={lat}
@@ -149,13 +188,14 @@ export default function RadarScreen() {
         layer={activeLayer}
         weather={weather}
         airQuality={airQuality}
+        timelineRange={range}
         onFrameUpdate={handleFrameUpdate}
+        onTimelineReady={handleTimelineReady}
       />
 
-      {/* Top overlay: location + layer info */}
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
-          <Ionicons name="location-sharp" size={14} color={activeConfig.color} />
+          <Ionicons name="location-sharp" size={14} color={ACCENT} />
           <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
           <Ionicons name="chevron-down" size={14} color={TEXT_TERTIARY} />
           <View style={[styles.layerBadge, { borderColor: activeConfig.color }]}>
@@ -170,82 +210,18 @@ export default function RadarScreen() {
         <RadarLegend layer={activeLayer} />
       </View>
 
-      {/* Bottom overlay: layer selector + animation controls */}
-      <View style={styles.bottomOverlay} pointerEvents="box-none">
-        {/* Animation controls */}
-        {totalFrames > 0 && (
-          <View style={styles.animationPill} pointerEvents="auto">
-            <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
-              <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
-                size={18}
-                color={ACCENT}
-              />
-            </TouchableOpacity>
-            <View style={styles.timeline}>
-              {Array.from({ length: totalFrames }).map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.timelineDot,
-                    i === frameIndex && styles.timelineDotActive,
-                    i < frameIndex && styles.timelineDotPast,
-                  ]}
-                />
-              ))}
-            </View>
-            <View style={styles.timelineMeta}>
-              <View style={styles.rangeToggle}>
-                <Pressable
-                  style={[
-                    styles.rangeChip,
-                    range === '1h' && styles.rangeChipActive,
-                  ]}
-                  onPress={() => setRange('1h')}
-                >
-                  <Text
-                    style={[
-                      styles.rangeChipLabel,
-                      range === '1h' && styles.rangeChipLabelActive,
-                    ]}
-                  >
-                    1h
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.rangeChip,
-                    range === '12h' && styles.rangeChipActive,
-                  ]}
-                  onPress={() => setRange('12h')}
-                >
-                  <Text
-                    style={[
-                      styles.rangeChipLabel,
-                      range === '12h' && styles.rangeChipLabelActive,
-                    ]}
-                  >
-                    12h
-                  </Text>
-                </Pressable>
-              </View>
-              <View style={styles.forecastBadge}>
-                <Text style={styles.forecastText}>
-                  {currentOffsetHours === 0 ? 'Now' : `+${currentOffsetHours}h`}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Layer selector */}
+      <View style={[styles.bottomOverlay, { paddingBottom: bottomPad }]} pointerEvents="box-none">
         <View style={styles.layerPill} pointerEvents="auto">
           {LAYERS.map((layer) => {
             const isActive = layer.key === activeLayer
             return (
               <Pressable
                 key={layer.key}
-                style={[styles.layerBtn, isActive && { borderColor: layer.color, borderWidth: 1.5 }]}
+                style={[
+                  styles.layerBtn,
+                  isActive && styles.layerBtnActive,
+                  isActive && { borderColor: layer.color },
+                ]}
                 onPress={() => {
                   setActiveLayer(layer.key)
                   setIsPlaying(true)
@@ -256,7 +232,7 @@ export default function RadarScreen() {
                 <Ionicons
                   name={layer.icon}
                   size={20}
-                  color={isActive ? layer.color : TEXT_TERTIARY}
+                  color={isActive ? layer.color : TEXT_SECONDARY}
                 />
                 <Text style={[styles.layerBtnLabel, isActive && { color: layer.color }]}>
                   {layer.label}
@@ -265,6 +241,59 @@ export default function RadarScreen() {
             )
           })}
         </View>
+
+        {totalFrames > 0 && (
+          <View style={styles.timelineCard} pointerEvents="auto">
+            <View style={styles.timelineTopRow}>
+              <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
+                <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={ACCENT_SOFT} />
+              </TouchableOpacity>
+              <View style={styles.timeBlock}>
+                <Text style={styles.timeLabel}>Map time</Text>
+                <Text style={styles.timeHero} numberOfLines={1}>
+                  {formatHeroTime(currentTimeIso)}
+                </Text>
+              </View>
+              <View style={styles.rangeToggle}>
+                <Pressable
+                  style={[styles.rangeChip, range === '1h' && styles.rangeChipActive]}
+                  onPress={() => setRange('1h')}
+                >
+                  <Text
+                    style={[styles.rangeChipLabel, range === '1h' && styles.rangeChipLabelActive]}
+                  >
+                    1h
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.rangeChip, range === '12h' && styles.rangeChipActive]}
+                  onPress={() => setRange('12h')}
+                >
+                  <Text
+                    style={[styles.rangeChipLabel, range === '12h' && styles.rangeChipLabelActive]}
+                  >
+                    12h
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={styles.offsetBadge}>
+                <Text style={styles.offsetText}>
+                  {currentOffsetHours === 0 ? 'Now' : `+${currentOffsetHours}h`}
+                </Text>
+              </View>
+            </View>
+            <RadarTimeScrubber
+              key={`${activeLayer}-${totalFrames}-${range}`}
+              times={Array.from({ length: totalFrames }, (_, i) => frameTimes[i] ?? '')}
+              selectedIndex={Math.min(frameIndex, Math.max(0, totalFrames - 1))}
+              onSelectIndex={onSelectFrame}
+              onInteractionStart={() => {
+                mapRef.current?.pause()
+                setIsPlaying(false)
+              }}
+            />
+          </View>
+        )}
       </View>
 
       <LocationPickerModal
@@ -305,7 +334,6 @@ const styles = StyleSheet.create({
     color: TEXT_SECONDARY,
     marginTop: 4,
   },
-  // Top overlay
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -318,17 +346,17 @@ const styles = StyleSheet.create({
     gap: 6,
     marginHorizontal: 16,
     marginTop: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(20,26,40,0.85)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: GLASS_BG,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: GHOST_BORDER,
     alignSelf: 'stretch',
   },
   cityName: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...FONT_BOLD,
+    fontSize: 16,
     color: TEXT_PRIMARY,
     flex: 1,
   },
@@ -337,123 +365,115 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.10)',
+    backgroundColor: 'rgba(0,0,0,0.12)',
   },
   layerBadgeText: {
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  // Bottom overlay
   bottomOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 24,
-    gap: 10,
+    gap: 12,
   },
   legendOverlay: {
     position: 'absolute',
     left: 16,
     top: 96,
   },
-  // Animation bar
-  animationPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(20,26,40,0.88)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    gap: 12,
+  timelineCard: {
+    marginHorizontal: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: RADAR_FLOAT_SURFACE,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: RADAR_FLOAT_BORDER,
   },
-  playButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(74,158,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeline: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    flexWrap: 'nowrap',
-    overflow: 'hidden',
-  },
-  timelineDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  timelineDotActive: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: ACCENT,
-  },
-  timelineDotPast: {
-    backgroundColor: 'rgba(74,158,255,0.45)',
-  },
-  forecastBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(74,158,255,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(74,158,255,0.28)',
-  },
-  forecastText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: ACCENT,
-    letterSpacing: 0.5,
-  },
-  timelineMeta: {
+  timelineTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    marginBottom: 6,
+  },
+  playButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 193, 7, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.35)',
+  },
+  timeBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  timeLabel: {
+    ...FONT_MEDIUM,
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: TEXT_TERTIARY,
+    marginBottom: 2,
+  },
+  timeHero: {
+    ...FONT_BOLD,
+    fontSize: 16,
+    color: ACCENT_SOFT,
   },
   rangeToggle: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.14)',
+    backgroundColor: 'rgba(0,0,0,0.32)',
     borderRadius: 999,
     padding: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(222, 225, 247, 0.1)',
   },
   rangeChip: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 999,
   },
   rangeChipActive: {
-    backgroundColor: 'rgba(74,158,255,0.26)',
+    backgroundColor: 'rgba(255, 193, 7, 0.22)',
   },
   rangeChipLabel: {
+    ...FONT_MEDIUM,
     fontSize: 11,
     color: TEXT_TERTIARY,
-    fontWeight: '600',
   },
   rangeChipLabelActive: {
-    color: ACCENT,
+    color: ACCENT_SOFT,
   },
-  // Layer selector
+  offsetBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 193, 7, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+  },
+  offsetText: {
+    ...FONT_BOLD,
+    fontSize: 10,
+    color: ACCENT_SOFT,
+    letterSpacing: 0.3,
+  },
   layerPill: {
     flexDirection: 'row',
     marginHorizontal: 16,
     padding: 8,
-    backgroundColor: 'rgba(20,26,40,0.92)',
+    backgroundColor: RADAR_FLOAT_SURFACE,
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    gap: 4,
+    borderWidth: 1.5,
+    borderColor: RADAR_FLOAT_BORDER,
+    gap: 6,
   },
   layerBtn: {
     flex: 1,
@@ -461,14 +481,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.10)',
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: 'rgba(222, 225, 247, 0.2)',
     borderWidth: 1.5,
   },
+  layerBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
   layerBtnLabel: {
+    ...FONT_MEDIUM,
     fontSize: 10,
-    fontWeight: '600',
-    color: TEXT_TERTIARY,
+    color: TEXT_SECONDARY,
     letterSpacing: 0.3,
   },
 })

@@ -2,8 +2,8 @@ import React from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { ComponentProps } from 'react'
-import GlassCard from '@/src/components/shared/GlassCard'
-import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, ACCENT } from '@/src/theme/colors'
+import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, ACCENT, GLASS_BG, GHOST_BORDER } from '@/src/theme/colors'
+import { FONT_BOLD } from '@/src/theme/typography'
 import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { formatTemp } from '@/src/utils/formatTemp'
 import type { HourlyWeather } from '@/src/types/weather'
@@ -33,84 +33,80 @@ export default function HourlyStrip({ hourly, unit }: HourlyStripProps) {
   const displayHours = hourly.time.slice(startIdx, startIdx + 24)
 
   return (
-    <GlassCard style={styles.card}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {displayHours.map((time, i) => {
-          const idx = startIdx + i
-          const temp = hourly.temperature[idx] ?? 0
-          const code = hourly.weatherCode[idx] ?? 0
-          const precipProb = hourly.precipitationProbability[idx] ?? 0
-          const { ionicon } = getWeatherCodeInfo(code)
-          const isNow = i === 0
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+    >
+      {displayHours.map((time, i) => {
+        const idx = startIdx + i
+        const temp = hourly.temperature[idx] ?? 0
+        const code = hourly.weatherCode[idx] ?? 0
+        const { ionicon } = getWeatherCodeInfo(code)
+        const isNow = i === 0
 
-          return (
-            <View key={time} style={styles.hourItem}>
-              <Text style={[styles.hourLabel, isNow && styles.nowLabel]}>
-                {isNow ? 'Now' : formatHour(time)}
-              </Text>
-              <Ionicons
-                name={ionicon as IoniconName}
-                size={20}
-                color={isNow ? ACCENT : TEXT_SECONDARY}
-              />
-              {precipProb > 20 ? (
-                <Text style={styles.precipText}>{precipProb}%</Text>
-              ) : (
-                <View style={styles.precipPlaceholder} />
-              )}
-              <Text style={[styles.tempText, isNow && styles.nowTemp]}>
-                {formatTemp(temp, unit)}
-              </Text>
-            </View>
-          )
-        })}
-      </ScrollView>
-    </GlassCard>
+        return (
+          <View
+            key={time}
+            style={[
+              styles.chip,
+              isNow && styles.chipActive,
+            ]}
+          >
+            <Text style={[styles.hourLabel, isNow && styles.nowLabel]}>
+              {isNow ? 'Now' : formatHour(time)}
+            </Text>
+            <Ionicons
+              name={ionicon as IoniconName}
+              size={28}
+              color={isNow ? ACCENT : TEXT_PRIMARY}
+            />
+            <Text style={[styles.tempText, isNow && styles.nowTemp]}>
+              {formatTemp(temp, unit)}
+            </Text>
+          </View>
+        )
+      })}
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginHorizontal: 16,
-    paddingVertical: 16,
-  },
   scrollContent: {
-    paddingHorizontal: 12,
-    gap: 4,
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 4,
   },
-  hourItem: {
+  chip: {
+    width: 96,
+    minHeight: 152,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: GHOST_BORDER,
+    backgroundColor: GLASS_BG,
     alignItems: 'center',
-    width: 58,
-    gap: 6,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 12,
+  },
+  chipActive: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderColor: 'rgba(255, 193, 7, 0.35)',
   },
   hourLabel: {
+    ...FONT_BOLD,
     fontSize: 12,
     color: TEXT_TERTIARY,
-    fontWeight: '500',
   },
   nowLabel: {
-    color: ACCENT,
-    fontWeight: '700',
-  },
-  precipText: {
-    fontSize: 10,
-    color: ACCENT,
-    height: 14,
-  },
-  precipPlaceholder: {
-    height: 14,
+    color: TEXT_PRIMARY,
   },
   tempText: {
-    fontSize: 13,
+    ...FONT_BOLD,
+    fontSize: 17,
     color: TEXT_SECONDARY,
-    fontWeight: '500',
   },
   nowTemp: {
     color: TEXT_PRIMARY,
-    fontWeight: '700',
   },
 })

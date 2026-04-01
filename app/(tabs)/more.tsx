@@ -20,9 +20,7 @@ import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useEra5History } from '@/src/hooks/useEra5History'
 import { useLocation } from '@/src/hooks/useLocation'
 import GlassCard from '@/src/components/shared/GlassCard'
-import ActivityScoreRow from '@/src/components/activities/ActivityScoreRow'
 import SectionLabel from '@/src/components/shared/SectionLabel'
-import HealthInsightsCard from '@/src/components/more/HealthInsightsCard'
 import HistoryBriefCard from '@/src/components/more/HistoryBriefCard'
 import ActivityWeekOutlook from '@/src/components/more/ActivityWeekOutlook'
 import {
@@ -41,9 +39,9 @@ import { buildSevenDayActivityOutlook } from '@/src/utils/activityWeekOutlook'
 import { buildHistoryBrief } from '@/src/utils/historyBrief'
 import {
   airQualityHourIndex,
-  buildHealthInsights,
   maxPollenLevelAtHour,
 } from '@/src/utils/healthInsights'
+import { describeAQI, describeUV } from '@/src/utils/weatherDescriptions'
 import type { ActivityScore } from '@/src/types/weather'
 import {
   BG,
@@ -51,8 +49,12 @@ import {
   TEXT_SECONDARY,
   TEXT_TERTIARY,
   ACCENT,
-  GLASS_BORDER,
+  SECONDARY,
+  ON_PRIMARY,
+  ON_SURFACE_VARIANT,
+  SURFACE_CONTAINER,
 } from '@/src/theme/colors'
+import { FONT_BOLD } from '@/src/theme/typography'
 
 type IoniconName = ComponentProps<typeof Ionicons>['name']
 
@@ -77,16 +79,23 @@ const ACTIVITIES: ActivityConfig[] = [
 ]
 
 const ALERT_ROWS = [
-  { key: 'rain' as const, label: 'Rain Alert', icon: 'rainy-outline' as const, thresholdKey: 'rain' as const },
-  { key: 'uv' as const, label: 'UV Alert', icon: 'sunny-outline' as const, thresholdKey: 'uv' as const },
-  { key: 'wind' as const, label: 'Wind Alert', icon: 'speedometer-outline' as const, thresholdKey: 'wind' as const },
-  { key: 'pollen' as const, label: 'Pollen Alert', icon: 'flower-outline' as const, thresholdKey: 'pollen' as const },
+  { key: 'rain' as const, label: 'Rain & Storms', icon: 'rainy-outline' as const, thresholdKey: 'rain' as const },
+  { key: 'uv' as const, label: 'UV Index Peak', icon: 'sunny-outline' as const, thresholdKey: 'uv' as const },
+  { key: 'wind' as const, label: 'High Wind', icon: 'speedometer-outline' as const, thresholdKey: 'wind' as const },
+  { key: 'pollen' as const, label: 'Pollen', icon: 'flower-outline' as const, thresholdKey: 'pollen' as const },
   { key: 'severe' as const, label: 'Severe Weather', icon: 'thunderstorm-outline' as const, thresholdKey: 'severe' as const },
 ]
 
+interface HealthTile {
+  title: string
+  icon: IoniconName
+  headline: string
+  sub: string
+}
+
 export default function MoreScreen() {
   useLocation()
-  const { lat, lon } = useLocationStore()
+  const { lat, lon, cityName } = useLocationStore()
   const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
   const { data: airQuality } = useAirQuality(lat, lon)
   const {
@@ -105,11 +114,45 @@ export default function MoreScreen() {
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
-  const healthLines = useMemo(() => {
+  const healthTiles = useMemo((): HealthTile[] => {
     if (!weather) return []
+    const tiles: HealthTile[] = []
+    if (airQuality) {
+      const d = describeAQI(airQuality.current.usAqi)
+      tiles.push({
+        title: 'Air Quality',
+        icon: 'leaf-outline',
+        headline: `${d.label} (${airQuality.current.usAqi})`,
+        sub: d.advice,
+      })
+    }
     const hourIdx = airQuality ? airQualityHourIndex(airQuality.hourly.time) : 0
     const pollen = airQuality ? maxPollenLevelAtHour(airQuality.hourly, hourIdx) : 'unavailable'
-    return buildHealthInsights(weather.current, airQuality?.current ?? null, pollen)
+    if (pollen !== 'unavailable') {
+      tiles.push({
+        title: 'Pollen',
+        icon: 'flower-outline',
+        headline: `${pollen} pollen`,
+        sub:
+          pollen === 'None' || pollen === 'Low'
+            ? 'Levels look manageable for most people today.'
+            : 'Sensitive individuals may want to limit long outdoor blocks when counts peak.',
+      })
+    } else {
+      tiles.push({
+        title: 'Pollen',
+        icon: 'flower-outline',
+        headline: 'No data',
+        sub: 'Pollen model coverage varies by region.',
+      })
+    }
+    tiles.push({
+      title: 'UV Exposure',
+      icon: 'sunny-outline',
+      headline: `UV ${Math.round(weather.current.uvIndex)}`,
+      sub: describeUV(weather.current.uvIndex),
+    })
+    return tiles
   }, [weather, airQuality])
 
   const activityWeek = useMemo(
@@ -125,6 +168,9 @@ export default function MoreScreen() {
   const era5ErrorMessage =
     era5Error instanceof Error ? era5Error.message : era5Error != null ? 'Could not load history.' : null
 
+  const colA = ACTIVITIES.slice(0, 5)
+  const colB = ACTIVITIES.slice(5, 10)
+
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <StatusBar barStyle="light-content" />
@@ -134,12 +180,19 @@ export default function MoreScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>More</Text>
+          <View style={styles.headerLeft}>
+            <Ionicons name="location-sharp" size={20} color={ACCENT} />
+            <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Text style={styles.unitHint}>°{unit}</Text>
+            <Ionicons name="moon-outline" size={22} color={TEXT_SECONDARY} />
+          </View>
         </View>
 
-        {/* Health correlations */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="Health & comfort" />
+        <View style={styles.sectionHead}>
+          <SectionLabel text="Health & comfort" accent />
+          <Text style={styles.liveTag}>Live insights</Text>
         </View>
         {weatherLoading || !weather ? (
           <View style={styles.loadingRow}>
@@ -147,13 +200,76 @@ export default function MoreScreen() {
             <Text style={styles.loadingText}>Loading conditions…</Text>
           </View>
         ) : (
-          <HealthInsightsCard lines={healthLines} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.healthScroll}
+          >
+            {healthTiles.map((t) => (
+              <GlassCard key={t.title} style={styles.healthCard}>
+                <View style={styles.healthTop}>
+                  <Ionicons name={t.icon} size={22} color={ACCENT} />
+                  <Text style={styles.healthKicker}>{t.title}</Text>
+                </View>
+                <Text style={styles.healthHeadline}>{t.headline}</Text>
+                <Text style={styles.healthSub}>{t.sub}</Text>
+              </GlassCard>
+            ))}
+          </ScrollView>
         )}
 
         <View style={styles.spacer} />
 
-        {/* 7-day activity outlook */}
-        <View style={styles.sectionHeader}>
+        <SectionLabel text="Today's Activity Scores" accent />
+        {weatherLoading || !weather ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={styles.loadingText}>Computing activity scores…</Text>
+          </View>
+        ) : (
+          <View style={styles.bentoRow}>
+            <GlassCard style={styles.bentoCol}>
+              {colA.map((activity, i) => {
+                const score = activity.scorer(weather.hourly, weather.daily, today)
+                const isLast = i === colA.length - 1
+                return (
+                  <View
+                    key={activity.key}
+                    style={[styles.bentoLine, !isLast && styles.bentoLineBorder]}
+                  >
+                    <View style={styles.bentoIconGold}>
+                      <Ionicons name={activity.icon} size={18} color={ACCENT} />
+                    </View>
+                    <Text style={styles.bentoName}>{activity.name}</Text>
+                    <Text style={styles.bentoScoreGold}>{score.score.toFixed(1)}</Text>
+                  </View>
+                )
+              })}
+            </GlassCard>
+            <GlassCard style={styles.bentoCol}>
+              {colB.map((activity, i) => {
+                const score = activity.scorer(weather.hourly, weather.daily, today)
+                const isLast = i === colB.length - 1
+                return (
+                  <View
+                    key={activity.key}
+                    style={[styles.bentoLine, !isLast && styles.bentoLineBorder]}
+                  >
+                    <View style={styles.bentoIconBlue}>
+                      <Ionicons name={activity.icon} size={18} color={SECONDARY} />
+                    </View>
+                    <Text style={styles.bentoName}>{activity.name}</Text>
+                    <Text style={styles.bentoScoreBlue}>{score.score.toFixed(1)}</Text>
+                  </View>
+                )
+              })}
+            </GlassCard>
+          </View>
+        )}
+
+        <View style={styles.spacer} />
+
+        <View style={styles.sectionHead}>
           <SectionLabel text="7-Day Activity Outlook" />
         </View>
         {weatherLoading || !weather ? (
@@ -175,70 +291,32 @@ export default function MoreScreen() {
 
         <View style={styles.spacer} />
 
-        {/* Today's activities */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="Today's Activities" />
-        </View>
-        <GlassCard style={styles.activitiesCard}>
-          {weatherLoading || !weather ? (
-            <View style={styles.loadingRowInset}>
-              <ActivityIndicator size="small" color={ACCENT} />
-              <Text style={styles.loadingText}>Computing activity scores…</Text>
-            </View>
-          ) : (
-            ACTIVITIES.map((activity, i) => {
-              const score = activity.scorer(weather.hourly, weather.daily, today)
-              const isLast = i === ACTIVITIES.length - 1
-              return (
-                <View key={activity.key} style={isLast && styles.lastRow}>
-                  <ActivityScoreRow
-                    name={activity.name}
-                    icon={activity.icon}
-                    score={score}
-                  />
-                </View>
-              )
-            })
-          )}
-        </GlassCard>
-
-        <View style={styles.spacer} />
-
-        {/* Settings */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="Settings" />
-        </View>
+        <SectionLabel text="Display units" accent />
         <GlassCard style={styles.settingsCard}>
-          <View style={styles.settingRow}>
-            <Ionicons name="thermometer-outline" size={20} color={TEXT_SECONDARY} />
-            <Text style={styles.settingLabel}>Temperature Unit</Text>
-            <View style={styles.unitButtons}>
-              <TouchableOpacity
-                style={[styles.unitBtn, unit === 'C' && styles.unitBtnActive]}
-                onPress={() => setUnit('C')}
-              >
-                <Text style={[styles.unitBtnText, unit === 'C' && styles.unitBtnTextActive]}>°C</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.unitBtn, unit === 'F' && styles.unitBtnActive]}
-                onPress={() => setUnit('F')}
-              >
-                <Text style={[styles.unitBtnText, unit === 'F' && styles.unitBtnTextActive]}>°F</Text>
-              </TouchableOpacity>
-            </View>
+          <Text style={styles.settingsHint}>Temperature</Text>
+          <View style={styles.pillRow}>
+            <TouchableOpacity
+              style={[styles.pillBtn, unit === 'C' && styles.pillBtnOn]}
+              onPress={() => setUnit('C')}
+            >
+              <Text style={[styles.pillTxt, unit === 'C' && styles.pillTxtOn]}>Celsius</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.pillBtn, unit === 'F' && styles.pillBtnOn]}
+              onPress={() => setUnit('F')}
+            >
+              <Text style={[styles.pillTxt, unit === 'F' && styles.pillTxtOn]}>Fahrenheit</Text>
+            </TouchableOpacity>
           </View>
         </GlassCard>
 
         <View style={styles.spacer} />
 
-        {/* Alerts */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="Alerts" />
-        </View>
+        <SectionLabel text="Alert subscriptions" accent />
         <GlassCard style={styles.settingsCard}>
           {ALERT_ROWS.map(({ key, label, icon, thresholdKey }, i, arr) => (
             <View key={key} style={[styles.alertRow, i < arr.length - 1 && styles.alertRowBorder]}>
-              <Ionicons name={icon} size={18} color={TEXT_SECONDARY} />
+              <Ionicons name={icon} size={20} color={SECONDARY} />
               <View style={styles.alertInfo}>
                 <Text style={styles.alertLabel}>{label}</Text>
                 <Text style={styles.alertDesc}>
@@ -252,7 +330,7 @@ export default function MoreScreen() {
               <Switch
                 value={alertsEnabled[key]}
                 onValueChange={() => toggleAlert(key)}
-                trackColor={{ false: 'rgba(255,255,255,0.15)', true: ACCENT }}
+                trackColor={{ false: 'rgba(255,255,255,0.12)', true: ACCENT }}
                 thumbColor="#fff"
               />
             </View>
@@ -261,9 +339,7 @@ export default function MoreScreen() {
 
         <View style={styles.aboutRow}>
           <Ionicons name="information-circle-outline" size={14} color={TEXT_TERTIARY} />
-          <Text style={styles.aboutText}>
-            Powered by Open-Meteo · Free &amp; open source
-          </Text>
+          <Text style={styles.aboutText}>Powered by Open-Meteo · Free &amp; open data</Text>
         </View>
 
         <View style={styles.bottomPad} />
@@ -282,25 +358,140 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 8,
+    paddingBottom: 120,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    marginBottom: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cityName: {
+    ...FONT_BOLD,
+    fontSize: 18,
     color: TEXT_PRIMARY,
   },
-  sectionHeader: {
+  unitHint: {
+    ...FONT_BOLD,
+    fontSize: 16,
+    color: ACCENT,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    marginBottom: 12,
+  },
+  liveTag: {
+    ...FONT_BOLD,
+    fontSize: 10,
+    letterSpacing: 0.5,
+    color: `${SECONDARY}80`,
+  },
+  healthScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 8,
+  },
+  healthCard: {
+    width: 280,
+    padding: 20,
+    marginRight: 4,
+  },
+  healthTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  healthKicker: {
+    ...FONT_BOLD,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    color: TEXT_TERTIARY,
+    textTransform: 'uppercase',
+  },
+  healthHeadline: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: TEXT_PRIMARY,
+    marginBottom: 6,
+  },
+  healthSub: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: ON_SURFACE_VARIANT,
+  },
+  bentoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  bentoCol: {
+    flex: 1,
+    minWidth: 150,
+    padding: 16,
+  },
+  bentoLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+  bentoLineBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  bentoIconGold: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bentoIconBlue: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(59, 147, 243, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bentoName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: TEXT_PRIMARY,
+  },
+  bentoScoreGold: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: ACCENT,
+  },
+  bentoScoreBlue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: SECONDARY,
   },
   spacer: {
     height: 20,
   },
   bottomPad: {
-    height: 32,
+    height: 24,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -309,70 +500,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  loadingRowInset: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 20,
-  },
   loadingText: {
     fontSize: 13,
     color: TEXT_SECONDARY,
   },
-  activitiesCard: {
-    marginHorizontal: 16,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  lastRow: {
-    borderBottomWidth: 0,
-  },
   settingsCard: {
     marginHorizontal: 16,
-    paddingHorizontal: 16,
+    padding: 12,
   },
-  settingRow: {
+  settingsHint: {
+    ...FONT_BOLD,
+    fontSize: 11,
+    color: TEXT_TERTIARY,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  pillRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-  },
-  settingLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: TEXT_PRIMARY,
-    fontWeight: '500',
-  },
-  unitButtons: {
-    flexDirection: 'row',
+    backgroundColor: SURFACE_CONTAINER,
+    borderRadius: 12,
+    padding: 4,
     gap: 4,
   },
-  unitBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  pillBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
   },
-  unitBtnActive: {
-    backgroundColor: ACCENT,
+  pillBtnOn: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  unitBtnText: {
+  pillTxt: {
+    ...FONT_BOLD,
     fontSize: 13,
-    fontWeight: '600',
     color: TEXT_TERTIARY,
   },
-  unitBtnTextActive: {
-    color: '#fff',
+  pillTxtOn: {
+    color: BG,
   },
   alertRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
+    paddingHorizontal: 4,
   },
   alertRowBorder: {
-    borderBottomColor: GLASS_BORDER,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
     borderBottomWidth: 1,
   },
   alertInfo: {

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface": "#0e1322",
+            "on-tertiary": "#003061",
+            "inverse-surface": "#dee1f7",
+            "secondary-fixed": "#d4e3ff",
+            "surface-variant": "#2f3445",
+            "primary": "#ffe4af",
+            "inverse-primary": "#785900",
+            "surface-container-low": "#161b2b",
+            "tertiary-container": "#afccff",
+            "primary-container": "#ffc107",
+            "on-primary-fixed-variant": "#5b4300",
+            "on-secondary-fixed": "#001c39",
+            "on-secondary-fixed-variant": "#004884",
+            "outline-variant": "#4f4632",
+            "outline": "#9c8f78",
+            "tertiary-fixed": "#d5e3ff",
+            "error": "#ffb4ab",
+            "on-error": "#690005",
+            "surface-container-highest": "#2f3445",
+            "on-tertiary-fixed-variant": "#004689",
+            "on-error-container": "#ffdad6",
+            "on-primary": "#3f2e00",
+            "on-background": "#dee1f7",
+            "on-primary-container": "#6d5100",
+            "on-surface": "#dee1f7",
+            "on-surface-variant": "#d4c5ab",
+            "surface-bright": "#343949",
+            "on-primary-fixed": "#261a00",
+            "surface-container-high": "#25293a",
+            "primary-fixed-dim": "#fabd00",
+            "tertiary-fixed-dim": "#a8c8ff",
+            "background": "#0e1322",
+            "secondary-container": "#3b93f3",
+            "inverse-on-surface": "#2b3040",
+            "surface-tint": "#fabd00",
+            "surface-container": "#1a1f2f",
+            "on-secondary-container": "#002a52",
+            "on-tertiary-container": "#10559f",
+            "secondary": "#a4c9ff",
+            "tertiary": "#dce7ff",
+            "secondary-fixed-dim": "#a4c9ff",
+            "on-secondary": "#00315d",
+            "surface-container-lowest": "#090e1c",
+            "primary-fixed": "#ffdf9e",
+            "surface-dim": "#0e1322",
+            "error-container": "#93000a",
+            "on-tertiary-fixed": "#001b3c"
+          },
+          fontFamily: {
+            "headline": ["Plus Jakarta Sans"],
+            "body": ["Plus Jakarta Sans"],
+            "label": ["Plus Jakarta Sans"]
+          },
+          borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(24px);
+    }
+    .ghost-border {
+      border: 1.5px solid rgba(79, 70, 50, 0.15);
+    }
+    .hero-gradient {
+      background: radial-gradient(circle at 50% 0%, rgba(255, 193, 7, 0.15) 0%, rgba(14, 19, 34, 0) 70%);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-transparent">
+<div class="flex justify-between items-center w-full px-8 max-w-screen-xl mx-auto py-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#FFC107]">location_on</span>
+<span class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight">Kyiv</span>
+</div>
+<div class="flex items-center gap-6">
+<span class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight text-[#dee1f7]/70">°C</span>
+<button class="hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-[#dee1f7]">dark_mode</span>
+</button>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-screen-xl mx-auto hero-gradient">
+<!-- Hero Section: AQI Gauge -->
+<section class="flex flex-col md:flex-row items-center justify-between mb-12 gap-12">
+<div class="w-full md:w-1/2 space-y-4">
+<p class="text-label uppercase tracking-widest text-primary font-bold text-xs">Current Atmosphere</p>
+<h1 class="font-headline font-bold text-7xl md:text-8xl text-on-surface tracking-tighter leading-none">
+          42 <span class="text-3xl align-top text-primary">US AQI</span>
+</h1>
+<p class="text-headline-md font-medium text-2xl text-secondary">Good Quality</p>
+<p class="text-body-lg text-on-surface/70 max-w-md">Air quality is satisfactory, and air pollution poses little or no risk. Perfect for outdoor activities.</p>
+</div>
+<div class="w-full md:w-1/2 flex justify-center items-center">
+<!-- Visual Gauge Representation -->
+<div class="relative w-64 h-64 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90">
+<circle class="text-surface-container-highest opacity-20" cx="128" cy="128" fill="transparent" r="110" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary-container drop-shadow-[0_0_15px_rgba(255,193,7,0.4)]" cx="128" cy="128" fill="transparent" r="110" stroke="currentColor" stroke-dasharray="691" stroke-dashoffset="400" stroke-linecap="round" stroke-width="12"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="material-symbols-outlined text-4xl text-primary" style="font-variation-settings: 'FILL' 1;">eco</span>
+<span class="text-xs font-bold text-primary mt-2">OPTIMAL</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid Section -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<!-- European AQI -->
+<div class="md:col-span-2 glass-card rounded-lg p-8 ghost-border flex flex-col justify-between min-h-[240px]">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="text-label font-bold uppercase tracking-widest text-on-surface-variant text-xs">European AQI</h3>
+<span class="text-primary font-bold">Excellent</span>
+</div>
+<div class="mt-8 flex items-end gap-2">
+<div class="flex-1 bg-surface-container-highest h-16 rounded-sm opacity-20"></div>
+<div class="flex-1 bg-primary-container h-24 rounded-sm shadow-[0_0_10px_rgba(255,193,7,0.3)]"></div>
+<div class="flex-1 bg-surface-container-highest h-12 rounded-sm opacity-20"></div>
+<div class="flex-1 bg-surface-container-highest h-20 rounded-sm opacity-20"></div>
+<div class="flex-1 bg-surface-container-highest h-14 rounded-sm opacity-20"></div>
+<div class="flex-1 bg-surface-container-highest h-18 rounded-sm opacity-20"></div>
+<div class="flex-1 bg-surface-container-highest h-10 rounded-sm opacity-20"></div>
+</div>
+</div>
+<p class="text-sm text-on-surface-variant mt-4">Based on PM2.5, PM10, NO2, O3 and SO2 concentrations across Europe.</p>
+</div>
+<!-- Quick Stats Card -->
+<div class="glass-card rounded-lg p-8 ghost-border flex flex-col gap-6">
+<h3 class="text-label font-bold uppercase tracking-widest text-on-surface-variant text-xs">Wind &amp; Flow</h3>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">air</span>
+</div>
+<div>
+<p class="text-2xl font-bold">14 km/h</p>
+<p class="text-xs text-on-surface-variant">North-West</p>
+</div>
+</div>
+<div class="pt-4 border-t border-white/5">
+<p class="text-xs text-on-surface-variant mb-2">HUMIDITY</p>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[65%]"></div>
+</div>
+<div class="flex justify-between mt-2 text-[10px] font-bold">
+<span>DRY</span>
+<span>65%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Pollutants & Pollen Section -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+<!-- Pollutants List -->
+<section>
+<h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">analytics</span>
+          Pollutant Breakdown
+        </h2>
+<div class="grid grid-cols-2 gap-4">
+<!-- PM2.5 -->
+<div class="glass-card p-6 rounded-lg ghost-border">
+<p class="text-xs font-bold text-on-surface-variant mb-1">PM2.5</p>
+<p class="text-2xl font-bold">8.4 <span class="text-xs font-normal text-on-surface-variant">µg/m³</span></p>
+<div class="mt-3 text-[10px] px-2 py-1 bg-primary-container/10 text-primary-container rounded-full inline-block font-bold">LOW RISK</div>
+</div>
+<!-- PM10 -->
+<div class="glass-card p-6 rounded-lg ghost-border">
+<p class="text-xs font-bold text-on-surface-variant mb-1">PM10</p>
+<p class="text-2xl font-bold">12.1 <span class="text-xs font-normal text-on-surface-variant">µg/m³</span></p>
+<div class="mt-3 text-[10px] px-2 py-1 bg-primary-container/10 text-primary-container rounded-full inline-block font-bold">LOW RISK</div>
+</div>
+<!-- NO2 -->
+<div class="glass-card p-6 rounded-lg ghost-border">
+<p class="text-xs font-bold text-on-surface-variant mb-1">NO2</p>
+<p class="text-2xl font-bold">3.2 <span class="text-xs font-normal text-on-surface-variant">µg/m³</span></p>
+<div class="mt-3 text-[10px] px-2 py-1 bg-primary-container/10 text-primary-container rounded-full inline-block font-bold">LOW RISK</div>
+</div>
+<!-- O3 -->
+<div class="glass-card p-6 rounded-lg ghost-border">
+<p class="text-xs font-bold text-on-surface-variant mb-1">O3</p>
+<p class="text-2xl font-bold">48.6 <span class="text-xs font-normal text-on-surface-variant">µg/m³</span></p>
+<div class="mt-3 text-[10px] px-2 py-1 bg-primary-container/10 text-primary-container rounded-full inline-block font-bold">LOW RISK</div>
+</div>
+</div>
+</section>
+<!-- Pollen Forecast -->
+<section>
+<h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">potted_plant</span>
+          Allergen Outlook
+        </h2>
+<div class="space-y-3">
+<!-- Grass -->
+<div class="glass-card p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">grass</span>
+<span class="font-medium">Grass</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-primary">VERY LOW</span>
+<div class="w-24 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary-container h-full w-[10%]"></div>
+</div>
+</div>
+</div>
+<!-- Birch -->
+<div class="glass-card p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">forest</span>
+<span class="font-medium">Birch</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-on-surface-variant">NONE</span>
+<div class="w-24 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary-container h-full w-[0%]"></div>
+</div>
+</div>
+</div>
+<!-- Ragweed -->
+<div class="glass-card p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">eco</span>
+<span class="font-medium">Ragweed</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-secondary">MODERATE</span>
+<div class="w-24 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[45%]"></div>
+</div>
+</div>
+</div>
+<!-- Alder -->
+<div class="glass-card p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">park</span>
+<span class="font-medium">Alder</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-on-surface-variant">NONE</span>
+<div class="w-24 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary-container h-full w-[0%]"></div>
+</div>
+</div>
+</div>
+<!-- Olive -->
+<div class="glass-card p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">psychiatry</span>
+<span class="font-medium">Olive</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-on-surface-variant">LOW</span>
+<div class="w-24 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary-container h-full w-[20%]"></div>
+</div>
+</div>
+</div>
+<!-- Mugwort -->
+<div class="glass-card p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">move_selection_right</span>
+<span class="font-medium">Mugwort</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-on-surface-variant">NONE</span>
+<div class="w-24 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary-container h-full w-[0%]"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Map Contextual Card -->
+<div class="mt-12 glass-card rounded-lg overflow-hidden ghost-border">
+<div class="relative h-64 w-full">
+<img alt="City map overlay with green atmospheric glow representing good air quality" class="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-700" data-location="Kyiv" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVpDRdzSjcCinT_FW_UgJKPTxpL3zR7ku1nEKlkwv742tTqbbnYR7n_En-gSTVYIxQM7iFGloW37BchWr-g2_LskXYhLZbho_relsy-H0V1KPS9a45-wiJ9TQV8zyWKwmpXhmNfStbAAAlO3oZxxnfZ_LxdFgM6v8CJdEvphn9VupTsuN72QKr4gN5LzP6zx1rZBsg0zNElm3xLMVUxpa7Z5njT9Pfmah9rPl8FTcdqITHK13g4bmeMxzBtf4XEDw00LKJ_WrXtsk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent"></div>
+<div class="absolute bottom-6 left-6">
+<button class="bg-primary-container text-on-primary-container px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform">
+<span class="material-symbols-outlined">map</span>
+            View Air Quality Map
+          </button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-6 left-0 right-0 z-50 flex justify-around items-center px-6 py-3">
+<div class="bg-white/10 dark:bg-[#1a1f2f]/40 backdrop-blur-3xl fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md rounded-full border border-white/10 shadow-[0px_24px_48px_rgba(0,0,0,0.4)] flex justify-around items-center px-6 py-3">
+<div class="flex items-center justify-center text-[#dee1f7] w-12 h-12 hover:bg-white/20 rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</div>
+<div class="flex items-center justify-center bg-white dark:bg-[#dee1f7] text-[#0e1322] rounded-full w-12 h-12 shadow-[0_0_15px_rgba(255,255,255,0.5)] scale-100 hover:scale-110">
+<span class="material-symbols-outlined" data-icon="radar">radar</span>
+</div>
+<div class="flex items-center justify-center text-[#dee1f7] w-12 h-12 hover:bg-white/20 rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="airway">air</span>
+</div>
+<div class="flex items-center justify-center text-[#dee1f7] w-12 h-12 hover:bg-white/20 rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+</div>
+</div>
+</nav>
+</body></html>

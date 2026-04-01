@@ -1,7 +1,6 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import GlassCard from '@/src/components/shared/GlassCard'
-import SectionLabel from '@/src/components/shared/SectionLabel'
 import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, GOOD, WARNING, DANGER } from '@/src/theme/colors'
 import type { AirQualityData } from '@/src/types/weather'
 
@@ -40,7 +39,6 @@ function formatValue(value: number, key: string): string {
 export default function PollutantList({ current }: PollutantListProps) {
   return (
     <GlassCard style={styles.card}>
-      <SectionLabel text="Pollutants" />
       <View style={styles.list}>
         {POLLUTANTS.map(({ key, label, unit, goodBelow, badAbove }) => {
           const value = current[key] as number

@@ -7,10 +7,11 @@ import {
   ActivityIndicator,
   StatusBar,
   TouchableOpacity,
+  ImageBackground,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import type { ComponentProps } from 'react'
 import { useLocationStore } from '@/src/store/locationStore'
 import { usePrefsStore } from '@/src/store/prefsStore'
 import { useWeather } from '@/src/hooks/useWeather'
@@ -29,10 +30,21 @@ import {
   TEXT_SECONDARY,
   TEXT_TERTIARY,
   ACCENT,
+  ACCENT_SOFT,
   DANGER,
+  ON_PRIMARY,
+  ON_SURFACE_VARIANT,
+  SECONDARY,
 } from '@/src/theme/colors'
+import { FONT_BOLD, FONT_EXTRABOLD, FONT_MEDIUM } from '@/src/theme/typography'
 
-type IoniconName = ComponentProps<typeof Ionicons>['name']
+const HOME_BG =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuAsK_2xMI6P_20fBXoIj-WQ798haP2JyNR_4RIrXAwht72WYlos79L5JkKCNWK5QFvfr6cL8HCTw4jbtyhF-4lz_1aP6v-pjIgGa4xxhLUa1ygpLCQvcC5wCUKVBasuWXo2EP0vb4lIPKxyhhGCT8WkyEHn4Hg-2RKl267JYnuzcFhiLqUIk-h1cecvUDIDhfvy5hwGTMSVJFb74mnfKIRDXcL732aektYDjKyaBhFar3CMqfplNEOTH9-yUShOelZmBlBHtLgb7Ho'
+
+function tempNumber(value: number, unit: 'C' | 'F'): string {
+  if (unit === 'F') return String(Math.round(value * (9 / 5) + 32))
+  return String(Math.round(value))
+}
 
 export default function HomeScreen() {
   const { lat, lon, cityName, deviceCityName, savedLocations, recentLocationIds } =
@@ -45,7 +57,10 @@ export default function HomeScreen() {
   const setUnit = usePrefsStore((s) => s.setUnit)
   const [isPickerOpen, setPickerOpen] = useState(false)
 
-  const { data: weather, isLoading: weatherLoading, error: weatherError, refetch } = useWeather(lat, lon)
+  const { data: weather, isLoading: weatherLoading, error: weatherError, refetch } = useWeather(
+    lat,
+    lon,
+  )
 
   const isLoading = locationLoading || weatherLoading
 
@@ -93,80 +108,93 @@ export default function HomeScreen() {
   if (!weather) return null
 
   const { current, hourly, daily } = weather
-  const { ionicon, label: conditionLabel } = getWeatherCodeInfo(current.weatherCode)
+  const { label: conditionLabel } = getWeatherCodeInfo(current.weatherCode)
+  const num = tempNumber(current.temperature, unit)
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <View style={styles.root}>
       <StatusBar barStyle="light-content" />
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.locationRow} onPress={() => setPickerOpen(true)}>
-            <Ionicons name="location-sharp" size={16} color={ACCENT} />
-            <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
-            <Ionicons name="chevron-down" size={14} color={TEXT_TERTIARY} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setUnit(unit === 'C' ? 'F' : 'C')}
-            style={styles.unitToggle}
-          >
-            <Text style={styles.unitText}>°{unit === 'C' ? 'F' : 'C'}</Text>
-          </TouchableOpacity>
-        </View>
+      <ImageBackground
+        source={{ uri: HOME_BG }}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode="cover"
+      />
+      <LinearGradient
+        colors={['rgba(14, 19, 34, 0.05)', 'rgba(14, 19, 34, 0.75)', BG]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
 
-        {/* Hero — big temperature */}
-        <View style={styles.hero}>
-          <Text style={styles.temperature}>{formatTemp(current.temperature, unit)}</Text>
-          <View style={styles.conditionRow}>
-            <Ionicons name={ionicon as IoniconName} size={22} color={TEXT_SECONDARY} />
-            <Text style={styles.conditionLabel}>{conditionLabel}</Text>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.locationRow} onPress={() => setPickerOpen(true)}>
+              <Ionicons name="location-sharp" size={20} color={ACCENT} />
+              <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setUnit(unit === 'C' ? 'F' : 'C')}
+              style={styles.headerPill}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.headerPillTemp}>{formatTemp(current.temperature, unit)}</Text>
+              <View style={styles.headerDivider} />
+              <Ionicons name="moon-outline" size={18} color={ACCENT_SOFT} />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.feelsLike}>
-            Feels like {formatTemp(current.apparentTemperature, unit)}
-          </Text>
-          {current.precipitationProbability > 0 && (
-            <View style={styles.precipBadge}>
-              <Ionicons name="rainy-outline" size={13} color={ACCENT} />
-              <Text style={styles.precipBadgeText}>
-                {current.precipitationProbability}% chance of rain
-              </Text>
+
+          <View style={styles.heroBlock}>
+            <View style={styles.heroLeft}>
+              <View style={styles.tempRow}>
+                <Text style={styles.heroNum}>{num}</Text>
+                <Text style={styles.heroDeg}>°</Text>
+              </View>
+              <Text style={styles.conditionHeadline}>{conditionLabel}</Text>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaText}>
+                  Feels like {formatTemp(current.apparentTemperature, unit)}
+                </Text>
+                <View style={styles.metaDot} />
+                <View style={styles.rainRow}>
+                  <Ionicons name="water-outline" size={14} color={SECONDARY} />
+                  <Text style={styles.rainText}>{current.precipitationProbability}% rain</Text>
+                </View>
+              </View>
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* Daily brief */}
-        <DailyBriefCard current={current} hourly={hourly} />
+          <DailyBriefCard current={current} hourly={hourly} />
 
-        <View style={styles.spacer} />
+          <View style={styles.spacer} />
 
-        {/* Hourly strip */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="Hourly Forecast" />
-        </View>
-        <HourlyStrip hourly={hourly} unit={unit} />
+          <View style={styles.sectionHeader}>
+            <SectionLabel text="Hourly Forecast" />
+            <Text style={styles.sectionLink}>Live</Text>
+          </View>
+          <HourlyStrip hourly={hourly} unit={unit} />
 
-        <View style={styles.spacer} />
+          <View style={styles.spacer} />
 
-        {/* 14-day forecast */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="14-Day Forecast" />
-        </View>
-        <ForecastList daily={daily} unit={unit} days={14} />
+          <View style={styles.sectionHeader}>
+            <SectionLabel text="14-Day Forecast" />
+          </View>
+          <ForecastList daily={daily} unit={unit} days={14} />
 
-        <View style={styles.spacer} />
+          <View style={styles.spacer} />
 
-        {/* Metric tiles */}
-        <View style={styles.sectionHeader}>
-          <SectionLabel text="Conditions" />
-        </View>
-        <MetricTilesGrid current={current} />
+          <View style={styles.sectionHeader}>
+            <SectionLabel text="Atmospheric Conditions" />
+          </View>
+          <MetricTilesGrid current={current} />
 
-        <View style={styles.bottomPad} />
-      </ScrollView>
+          <View style={styles.bottomPad} />
+        </ScrollView>
+      </SafeAreaView>
+
       <LocationPickerModal
         visible={isPickerOpen}
         deviceCityName={deviceCityName}
@@ -179,20 +207,25 @@ export default function HomeScreen() {
           selectManualLocation(location)
         }}
       />
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  root: {
     flex: 1,
     backgroundColor: BG,
   },
-  scroll: {
+  safe: {
     flex: 1,
   },
+  scroll: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   scrollContent: {
-    paddingTop: 8,
+    paddingTop: 4,
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
@@ -228,8 +261,8 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
   },
   retryText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: ON_PRIMARY,
+    fontWeight: '700',
     fontSize: 14,
   },
   header: {
@@ -237,76 +270,114 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   cityName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: TEXT_PRIMARY,
-  },
-  unitToggle: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  unitText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: ACCENT,
-  },
-  hero: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    gap: 8,
-  },
-  temperature: {
-    fontSize: 72,
-    fontWeight: '200',
-    color: TEXT_PRIMARY,
-    letterSpacing: -2,
-  },
-  conditionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  conditionLabel: {
+    ...FONT_BOLD,
     fontSize: 18,
-    color: TEXT_SECONDARY,
-    fontWeight: '400',
+    color: TEXT_PRIMARY,
   },
-  feelsLike: {
-    fontSize: 14,
-    color: TEXT_TERTIARY,
-  },
-  precipBadge: {
+  headerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(74,158,255,0.12)',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(79, 70, 50, 0.15)',
   },
-  precipBadgeText: {
-    fontSize: 12,
+  headerPillTemp: {
+    ...FONT_BOLD,
+    fontSize: 14,
+    color: TEXT_PRIMARY,
+  },
+  headerDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(79, 70, 50, 0.25)',
+  },
+  heroBlock: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  heroLeft: {
+    gap: 6,
+  },
+  tempRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  heroNum: {
+    ...FONT_EXTRABOLD,
+    fontSize: 112,
+    lineHeight: 118,
+    color: TEXT_PRIMARY,
+    letterSpacing: -4,
+  },
+  heroDeg: {
+    ...FONT_BOLD,
+    fontSize: 40,
     color: ACCENT,
-    fontWeight: '500',
+    marginTop: 10,
+  },
+  conditionHeadline: {
+    ...FONT_MEDIUM,
+    fontSize: 28,
+    color: TEXT_PRIMARY,
+    marginTop: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    ...FONT_MEDIUM,
+    fontSize: 15,
+    color: ON_SURFACE_VARIANT,
+  },
+  metaDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(79, 70, 50, 0.5)',
+  },
+  rainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rainText: {
+    ...FONT_MEDIUM,
+    fontSize: 15,
+    color: SECONDARY,
   },
   sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 12,
+  },
+  sectionLink: {
+    ...FONT_BOLD,
+    fontSize: 11,
+    color: ACCENT,
+    letterSpacing: 1,
   },
   spacer: {
-    height: 20,
+    height: 24,
   },
   bottomPad: {
-    height: 32,
+    height: 24,
   },
 })

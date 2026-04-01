@@ -1,4 +1,4 @@
-import { GOOD, WARNING, DANGER, ACCENT } from '@/src/theme/colors'
+import { GOOD, WARNING, DANGER } from '@/src/theme/colors'
 
 export function describeHumidity(percent: number): string {
   if (percent <= 10) return 'Very dry — consider using a humidifier'

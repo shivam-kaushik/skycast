@@ -1,14 +1,11 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import type { ComponentProps } from 'react'
 import GlassCard from '@/src/components/shared/GlassCard'
 import { TEXT_SECONDARY, ACCENT } from '@/src/theme/colors'
+import { FONT_BOLD } from '@/src/theme/typography'
 import { generateDailyBrief } from '@/src/utils/dailyBrief'
-import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import type { CurrentWeather, HourlyWeather } from '@/src/types/weather'
-
-type IoniconName = ComponentProps<typeof Ionicons>['name']
 
 interface DailyBriefCardProps {
   current: CurrentWeather
@@ -17,35 +14,39 @@ interface DailyBriefCardProps {
 
 export default function DailyBriefCard({ current, hourly }: DailyBriefCardProps) {
   const brief = generateDailyBrief(current, hourly)
-  const { ionicon } = getWeatherCodeInfo(current.weatherCode)
 
   return (
     <GlassCard style={styles.card}>
-      <View style={styles.row}>
-        <Ionicons name={ionicon as IoniconName} size={26} color={ACCENT} style={styles.icon} />
-        <Text style={styles.text}>{brief}</Text>
+      <View style={styles.header}>
+        <Ionicons name="star" size={18} color={ACCENT} />
+        <Text style={styles.headerLabel}>Daily Brief</Text>
       </View>
+      <Text style={styles.text}>{brief}</Text>
     </GlassCard>
   )
 }
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
+    padding: 20,
     marginHorizontal: 16,
   },
-  row: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
   },
-  icon: {
-    marginTop: 1,
+  headerLabel: {
+    ...FONT_BOLD,
+    fontSize: 11,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: ACCENT,
   },
   text: {
-    flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: TEXT_SECONDARY,
-    lineHeight: 22,
+    lineHeight: 24,
   },
 })

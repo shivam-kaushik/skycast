@@ -5,11 +5,17 @@ import type { WeatherData } from '@/src/hooks/useWeather'
 import type { AirQualityData } from '@/src/types/weather'
 import { useOmeteoMapTileMetadata } from '@/src/hooks/useOmeteoMapTileMetadata'
 import { type MapLayer } from '@/src/components/radar/mapLayerConfig'
+import {
+  buildDisplayFrameApiIndices,
+  buildRadarDisplayFrameIndexes,
+} from '@/src/utils/radarFrameIndexes'
 export type { MapLayer } from '@/src/components/radar/mapLayerConfig'
 
 export interface WeatherMapHandle {
   play: () => void
   pause: () => void
+  /** Jump map animation to frame index (0-based). */
+  seekToFrame: (index: number) => void
 }
 
 interface WeatherMapViewProps {
@@ -18,7 +24,10 @@ interface WeatherMapViewProps {
   layer: MapLayer
   weather: WeatherData
   airQuality: AirQualityData | undefined
-  onFrameUpdate: (current: number, total: number) => void
+  onFrameUpdate: (current: number, total: number, timeISO: string | null) => void
+  onTimelineReady?: (times: string[]) => void
+  /** Open-Meteo layers only: restrict animation to the last 1h or 12h of valid_times. */
+  timelineRange?: '1h' | '12h'
 }
 
 interface OverlayData {
@@ -42,7 +51,11 @@ export function buildMapHTML(
     cloudValidTimesLength: number
     windVectorSourceUrl?: string
     windVectorValidTimesLength?: number
+    /** Open-Meteo `valid_times_*` indices (chronological order), already subsampled. */
+    frameIndices: number[]
   },
+  /** ISO time for each animation frame (same length as subsampled frames in the map) */
+  frameTimeLabels: string[],
 ): string {
   // Inject data as JSON — all JS inside uses var/concat to avoid TypeScript template literal conflicts
   const overlayJSON = JSON.stringify(overlay)
@@ -100,6 +113,8 @@ export function buildMapHTML(
   var WIND_VECTOR_VALID_TIMES_COUNT = ${params.windVectorValidTimesLength ?? params.tileValidTimesLength};
   var MAX_FRAMES = 8;
   var OM_MAX_NATIVE_ZOOM = 12;
+  var FRAME_INDICES = ${JSON.stringify(params.frameIndices)};
+  var FRAME_TIME_LABELS = ${JSON.stringify(frameTimeLabels)};
 
   var map = L.map('map', {
     center: [LAT, LON],
@@ -199,7 +214,12 @@ export function buildMapHTML(
         setLayerOpacity(cloudFrames[j].layer, j === idx ? cloudActiveOpacity : 0);
       }
       try {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'frame', current: idx, total: radarFrames.length }));
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'frame',
+          current: idx,
+          total: radarFrames.length,
+          timeISO: FRAME_TIME_LABELS[idx] || null
+        }));
       } catch(e) {}
     }
 
@@ -245,8 +265,15 @@ export function buildMapHTML(
       return;
     }
 
-    var frameCount = Math.min(TILE_VALID_TIMES_COUNT, MAX_FRAMES);
-    var frameIndexes = buildFrameIndexes(TILE_VALID_TIMES_COUNT, frameCount);
+    if (!FRAME_INDICES || FRAME_INDICES.length === 0) {
+      try {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: 'No tile frames available' }));
+      } catch (_) {}
+      return;
+    }
+
+    var frameIndexes = FRAME_INDICES.slice();
+    var frameCount = frameIndexes.length;
 
     for (var i = 0; i < frameIndexes.length; i++) {
       var timeIndex = frameIndexes[i];
@@ -321,20 +348,26 @@ export function buildMapHTML(
     showFrame(0);
     startAnimation();
 
-    document.addEventListener('message', function(e) {
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS }));
+    } catch (e) {}
+
+    function handleRnMessage(e) {
       try {
         var msg = JSON.parse(e.data);
         if (msg.type === 'play') { isPlaying = true; }
         if (msg.type === 'pause') { isPlaying = false; }
+        if (msg.type === 'seek' && typeof msg.index === 'number') {
+          var si = Math.floor(msg.index);
+          if (si >= 0 && si < radarFrames.length) {
+            currentFrame = si;
+            showFrame(currentFrame);
+          }
+        }
       } catch(_) {}
-    });
-    window.addEventListener('message', function(e) {
-      try {
-        var msg = JSON.parse(e.data);
-        if (msg.type === 'play') { isPlaying = true; }
-        if (msg.type === 'pause') { isPlaying = false; }
-      } catch(_) {}
-    });
+    }
+    document.addEventListener('message', handleRnMessage);
+    window.addEventListener('message', handleRnMessage);
   }
 
   // ── ANIMATED WEATHER LAYERS ────────────────────────────────────
@@ -511,6 +544,7 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
   };
 
   var tileLayers = [];
+  var FRAME_TIME_LABELS = [];
   var currentFrame = 0;
   var isPlaying = true;
   var animTimer = null;
@@ -520,7 +554,12 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
       tileLayers[i].setOpacity(i === idx ? 0.85 : 0);
     }
     try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'frame', current: idx, total: tileLayers.length }));
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'frame',
+        current: idx,
+        total: tileLayers.length,
+        timeISO: FRAME_TIME_LABELS[idx] || null
+      }));
     } catch(e) {}
   }
 
@@ -538,6 +577,13 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
       var msg = JSON.parse(e.data);
       if (msg.type === 'play') { isPlaying = true; }
       if (msg.type === 'pause') { isPlaying = false; }
+      if (msg.type === 'seek' && typeof msg.index === 'number') {
+        var si = Math.floor(msg.index);
+        if (si >= 0 && si < tileLayers.length) {
+          currentFrame = si;
+          showFrame(currentFrame);
+        }
+      }
     } catch(_) {}
   }
 
@@ -566,11 +612,21 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
         });
         tileLayer.addTo(map);
         tileLayers.push(tileLayer);
+        var ut = frame.time;
+        if (typeof ut === 'number') {
+          var ms = ut > 1e12 ? ut : ut * 1000;
+          FRAME_TIME_LABELS.push(new Date(ms).toISOString());
+        } else {
+          FRAME_TIME_LABELS.push('');
+        }
       }
 
       if (tileLayers.length > 0) {
         showFrame(0);
         startAnimation();
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS }));
+        } catch (e) {}
       }
     })
     .catch(function(e) {
@@ -583,8 +639,24 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
 </html>`
 }
 
+const MAX_MAP_FRAMES = 8
+
+function injectSeekScript(index: number): string {
+  const payload = JSON.stringify({ type: 'seek', index })
+  return `document.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`
+}
+
 const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props, ref) => {
-  const { lat, lon, layer, weather, airQuality, onFrameUpdate } = props
+  const {
+    lat,
+    lon,
+    layer,
+    weather,
+    airQuality,
+    onFrameUpdate,
+    onTimelineReady,
+    timelineRange = '12h',
+  } = props
   const webViewRef = useRef<WebView>(null)
   const [mapError, setMapError] = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
@@ -602,6 +674,12 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     setMapLoading(true)
   }, [lat, lon, layer])
 
+  useEffect(() => {
+    if (layer === 'precipitation') return
+    setMapError(false)
+    setMapLoading(true)
+  }, [layer, timelineRange])
+
   useImperativeHandle(ref, () => ({
     play() {
       webViewRef.current?.injectJavaScript(
@@ -612,6 +690,10 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       webViewRef.current?.injectJavaScript(
         'document.dispatchEvent(new MessageEvent("message", { data: \'{"type":"pause"}\' })); true;'
       )
+    },
+    seekToFrame(index: number) {
+      if (!Number.isFinite(index) || index < 0) return
+      webViewRef.current?.injectJavaScript(injectSeekScript(Math.floor(index)))
     },
   }))
 
@@ -646,9 +728,25 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     )
   }
 
+  const rangeHours = timelineRange === '1h' ? 1 : 12
+  const displayIndexes = !isPrecip
+    ? (() => {
+        const fromRange = buildDisplayFrameApiIndices(
+          tileMeta!.validTimes,
+          rangeHours,
+          MAX_MAP_FRAMES,
+        )
+        if (fromRange.length > 0) return fromRange
+        return buildRadarDisplayFrameIndexes(tileMeta!.tileValidTimesLength, MAX_MAP_FRAMES)
+      })()
+    : []
+  const frameTimeLabels = !isPrecip
+    ? displayIndexes.map((i) => tileMeta!.validTimes[i] ?? '')
+    : []
+
   const html = isPrecip
     ? buildPrecipitationHTML(lat, lon)
-    : buildMapHTML(lat, lon, layer, overlay, tileMeta!)
+    : buildMapHTML(lat, lon, layer, overlay, { ...tileMeta!, frameIndices: displayIndexes }, frameTimeLabels)
 
   // baseUrl must be a real HTTPS origin so Android WebView allows CDN requests
   const baseUrl = Platform.OS === 'android'
@@ -670,7 +768,11 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
         </View>
       )}
       <WebView
-        key={`${layer}-${lat}-${lon}`}
+        key={
+          isPrecip
+            ? `${layer}-${lat}-${lon}`
+            : `${layer}-${lat}-${lon}-${timelineRange}`
+        }
         ref={webViewRef}
         source={{ html, baseUrl }}
         style={styles.webview}
@@ -698,14 +800,19 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
               type: string
               current?: number
               total?: number
+              timeISO?: string | null
+              times?: string[]
             }
             if (msg.type === 'frame' && msg.current !== undefined && msg.total !== undefined) {
-              onFrameUpdate(msg.current, msg.total)
+              onFrameUpdate(msg.current, msg.total, msg.timeISO ?? null)
+            }
+            if (msg.type === 'timeline' && Array.isArray(msg.times)) {
+              onTimelineReady?.(msg.times)
             }
             if (msg.type === 'error') {
               setMapLoading(false)
               setMapError(true)
-              onFrameUpdate(0, 0)
+              onFrameUpdate(0, 0, null)
             }
           } catch (_) {
             // ignore

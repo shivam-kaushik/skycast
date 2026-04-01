@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Skycast - Insights &amp; Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface": "#0e1322",
+              "on-tertiary": "#003061",
+              "inverse-surface": "#dee1f7",
+              "secondary-fixed": "#d4e3ff",
+              "surface-variant": "#2f3445",
+              "primary": "#ffe4af",
+              "inverse-primary": "#785900",
+              "surface-container-low": "#161b2b",
+              "tertiary-container": "#afccff",
+              "primary-container": "#ffc107",
+              "on-primary-fixed-variant": "#5b4300",
+              "on-secondary-fixed": "#001c39",
+              "on-secondary-fixed-variant": "#004884",
+              "outline-variant": "#4f4632",
+              "outline": "#9c8f78",
+              "tertiary-fixed": "#d5e3ff",
+              "error": "#ffb4ab",
+              "on-error": "#690005",
+              "surface-container-highest": "#2f3445",
+              "on-tertiary-fixed-variant": "#004689",
+              "on-error-container": "#ffdad6",
+              "on-primary": "#3f2e00",
+              "on-background": "#dee1f7",
+              "on-primary-container": "#6d5100",
+              "on-surface": "#dee1f7",
+              "on-surface-variant": "#d4c5ab",
+              "surface-bright": "#343949",
+              "on-primary-fixed": "#261a00",
+              "surface-container-high": "#25293a",
+              "primary-fixed-dim": "#fabd00",
+              "tertiary-fixed-dim": "#a8c8ff",
+              "background": "#0e1322",
+              "secondary-container": "#3b93f3",
+              "inverse-on-surface": "#2b3040",
+              "surface-tint": "#fabd00",
+              "surface-container": "#1a1f2f",
+              "on-secondary-container": "#002a52",
+              "on-tertiary-container": "#10559f",
+              "secondary": "#a4c9ff",
+              "tertiary": "#dce7ff",
+              "secondary-fixed-dim": "#a4c9ff",
+              "on-secondary": "#00315d",
+              "surface-container-lowest": "#090e1c",
+              "primary-fixed": "#ffdf9e",
+              "surface-dim": "#0e1322",
+              "error-container": "#93000a",
+              "on-tertiary-fixed": "#001b3c"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .ghost-border {
+            border: 1.5px solid rgba(79, 70, 50, 0.15);
+        }
+        .stagger-entry {
+            animation: staggered-3d-entrance 0.6s ease-out forwards;
+            opacity: 0;
+            transform: scale(0.95) rotateX(5deg);
+        }
+        @keyframes staggered-3d-entrance {
+            to {
+                opacity: 1;
+                transform: scale(1) rotateX(0deg);
+            }
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface min-h-screen pb-32 overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-transparent">
+<div class="flex justify-between items-center w-full px-8 max-w-screen-xl mx-auto pt-4 h-16">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#FFC107]">location_on</span>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight text-[#dee1f7]">Kyiv</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:opacity-80 transition-opacity active:scale-95 transition-transform duration-300">
+<span class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight text-[#FFC107]">°C | </span>
+<span class="material-symbols-outlined text-[#dee1f7]/70 align-middle">dark_mode</span>
+</button>
+</div>
+</div>
+</header>
+<main class="max-w-screen-xl mx-auto px-6 pt-24 space-y-10">
+<!-- Health & Comfort Scroll -->
+<section class="stagger-entry" style="animation-delay: 0.1s;">
+<div class="flex items-baseline justify-between mb-4">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary/60">Health &amp; Comfort</h2>
+<span class="text-[10px] text-secondary/50">LIVE INSIGHTS</span>
+</div>
+<div class="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
+<div class="glass-card ghost-border min-w-[280px] p-6 rounded-lg shrink-0">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-primary">air</span>
+<span class="text-xs font-bold uppercase tracking-tighter opacity-70">Air Quality</span>
+</div>
+<p class="text-2xl font-bold mb-1">Excellent (24)</p>
+<p class="text-sm text-on-surface-variant">Ideal for outdoor respiratory exercise today.</p>
+</div>
+<div class="glass-card ghost-border min-w-[280px] p-6 rounded-lg shrink-0">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-primary">grass</span>
+<span class="text-xs font-bold uppercase tracking-tighter opacity-70">Pollen Count</span>
+</div>
+<p class="text-2xl font-bold mb-1">High (Tree)</p>
+<p class="text-sm text-on-surface-variant">Birch pollen levels are peaking. Carry antihistamines.</p>
+</div>
+<div class="glass-card ghost-border min-w-[280px] p-6 rounded-lg shrink-0">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-primary">wb_sunny</span>
+<span class="text-xs font-bold uppercase tracking-tighter opacity-70">UV Exposure</span>
+</div>
+<p class="text-2xl font-bold mb-1">Moderate (4)</p>
+<p class="text-sm text-on-surface-variant">Sun protection needed between 11 AM and 4 PM.</p>
+</div>
+</div>
+</section>
+<!-- Today's Activities Bento Grid -->
+<section class="stagger-entry" style="animation-delay: 0.2s;">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary/60 mb-6">Today's Activity Scores</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="glass-card ghost-border rounded-lg p-6 flex flex-col gap-4">
+<div class="flex justify-between items-center border-b border-white/5 pb-3" v-for="i in 5">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">directions_run</span>
+</div>
+<span class="font-medium">Morning Jogging</span>
+</div>
+<span class="text-primary font-bold text-lg">9.2</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">cycle</span>
+</div>
+<span class="font-medium">City Cycling</span>
+</div>
+<span class="text-primary font-bold text-lg">8.5</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">photo_camera</span>
+</div>
+<span class="font-medium">Landscape Photography</span>
+</div>
+<span class="text-primary font-bold text-lg">8.1</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">hiking</span>
+</div>
+<span class="font-medium">Trail Hiking</span>
+</div>
+<span class="text-primary font-bold text-lg">7.8</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">golf_course</span>
+</div>
+<span class="font-medium">Golf</span>
+</div>
+<span class="text-primary font-bold text-lg">6.4</span>
+</div>
+</div>
+<div class="glass-card ghost-border rounded-lg p-6 flex flex-col gap-4">
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">sailing</span>
+</div>
+<span class="font-medium">Sailing</span>
+</div>
+<span class="text-secondary font-bold text-lg">4.2</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">umbrella</span>
+</div>
+<span class="font-medium">Outdoor Dining</span>
+</div>
+<span class="text-secondary font-bold text-lg">3.9</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">wash</span>
+</div>
+<span class="font-medium">Car Wash</span>
+</div>
+<span class="text-secondary font-bold text-lg">2.1</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/5 pb-3">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">pool</span>
+</div>
+<span class="font-medium">Outdoor Pool</span>
+</div>
+<span class="text-secondary font-bold text-lg">1.5</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">dry_cleaning</span>
+</div>
+<span class="font-medium">Laundry Drying</span>
+</div>
+<span class="text-secondary font-bold text-lg">1.2</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 7-Day Activity Outlook -->
+<section class="stagger-entry" style="animation-delay: 0.3s;">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary/60 mb-6">7-Day Activity Outlook</h2>
+<div class="glass-card ghost-border rounded-lg overflow-hidden">
+<table class="w-full text-left">
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold w-24">MON</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">RUNNING</span>
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">CYCLING</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">14° / 22°</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold">TUE</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">HIKING</span>
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">GOLF</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">16° / 24°</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold">WED</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-secondary/20 text-secondary text-[10px] font-bold px-3 py-1 rounded-full border border-secondary/20">READING</span>
+<span class="bg-secondary/20 text-secondary text-[10px] font-bold px-3 py-1 rounded-full border border-secondary/20">GYM</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">12° / 15°</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold">THU</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">PHOTO</span>
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">PICNIC</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">18° / 26°</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold">FRI</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">DRIVING</span>
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">RUNNING</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">15° / 23°</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold">SAT</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-secondary/20 text-secondary text-[10px] font-bold px-3 py-1 rounded-full border border-secondary/20">MOVIES</span>
+<span class="bg-secondary/20 text-secondary text-[10px] font-bold px-3 py-1 rounded-full border border-secondary/20">COOKING</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">10° / 13°</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="py-4 px-6 font-bold text-primary">SUN</td>
+<td class="py-4 px-2">
+<div class="flex gap-2">
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">BOATING</span>
+<span class="bg-primary/20 text-primary text-[10px] font-bold px-3 py-1 rounded-full border border-primary/20">CYCLING</span>
+</div>
+</td>
+<td class="py-4 px-6 text-right text-on-surface-variant">19° / 27°</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Recent History ERA5 -->
+<section class="stagger-entry" style="animation-delay: 0.4s;">
+<div class="glass-card ghost-border rounded-lg p-8 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-8 opacity-10">
+<span class="material-symbols-outlined text-[120px]">history</span>
+</div>
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary/60 mb-6">Climate Context (ERA5)</h2>
+<div class="space-y-4 max-w-2xl">
+<p class="text-sm font-bold text-secondary uppercase tracking-tighter">Apr 10 - Apr 17 · Kyiv Region</p>
+<p class="text-xl leading-relaxed font-light text-on-surface">
+                        The past week saw a <span class="font-bold text-primary">+2.4°C anomaly</span> compared to the 30-year mean. Atmospheric pressure remained consistently high at <span class="text-secondary">1018hPa</span>, leading to exceptionally dry soil conditions. This trend mirrors the shifting seasonal onset observed in previous years.
+                    </p>
+<div class="pt-4 flex gap-8">
+<div>
+<p class="text-[10px] font-bold opacity-50 uppercase mb-1">Precipitation</p>
+<p class="text-lg font-bold">-15% Avg</p>
+</div>
+<div>
+<p class="text-[10px] font-bold opacity-50 uppercase mb-1">Cloud Cover</p>
+<p class="text-lg font-bold">22%</p>
+</div>
+<div>
+<p class="text-[10px] font-bold opacity-50 uppercase mb-1">Solar Flux</p>
+<p class="text-lg font-bold">18.5 MJ/m²</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Settings & Toggles -->
+<section class="stagger-entry" style="animation-delay: 0.5s;">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Unit Settings -->
+<div class="space-y-6">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary/60">Display Units</h2>
+<div class="glass-card ghost-border rounded-lg p-2 flex">
+<button class="flex-1 py-3 text-sm font-bold rounded-md bg-white text-surface shadow-lg">Celsius</button>
+<button class="flex-1 py-3 text-sm font-bold text-on-surface/60 hover:text-on-surface transition-colors">Fahrenheit</button>
+</div>
+<div class="glass-card ghost-border rounded-lg p-2 flex">
+<button class="flex-1 py-3 text-sm font-bold text-on-surface/60 hover:text-on-surface transition-colors">km/h</button>
+<button class="flex-1 py-3 text-sm font-bold bg-white text-surface shadow-lg rounded-md">m/s</button>
+<button class="flex-1 py-3 text-sm font-bold text-on-surface/60 hover:text-on-surface transition-colors">mph</button>
+</div>
+</div>
+<!-- Alert Toggles -->
+<div class="space-y-6">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary/60">Alert Subscriptions</h2>
+<div class="space-y-3">
+<div class="glass-card ghost-border rounded-lg p-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary">umbrella</span>
+<span class="font-medium">Rain &amp; Storms</span>
+</div>
+<div class="w-12 h-6 bg-primary rounded-full relative">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="glass-card ghost-border rounded-lg p-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-error">warning</span>
+<span class="font-medium">Severe Weather</span>
+</div>
+<div class="w-12 h-6 bg-primary rounded-full relative">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="glass-card ghost-border rounded-lg p-4 flex items-center justify-between opacity-60">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined">wb_sunny</span>
+<span class="font-medium">UV Index Peak</span>
+</div>
+<div class="w-12 h-6 bg-white/10 rounded-full relative">
+<div class="absolute left-1 top-1 w-4 h-4 bg-white/40 rounded-full"></div>
+</div>
+</div>
+<div class="glass-card ghost-border rounded-lg p-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">air</span>
+<span class="font-medium">High Wind</span>
+</div>
+<div class="w-12 h-6 bg-primary rounded-full relative">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="pt-12 pb-8 border-t border-white/5 stagger-entry" style="animation-delay: 0.6s;">
+<div class="flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface/40">
+                    Data provided by ECMWF / ERA5 Reanalysis &amp; OpenWeather API
+                </div>
+<div class="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-primary/60">
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="hover:text-primary transition-colors" href="#">Terms</a>
+<a class="hover:text-primary transition-colors" href="#">System Status</a>
+</div>
+</div>
+</footer>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-6 left-0 right-0 z-50 flex justify-around items-center px-6 py-3 bg-white/10 dark:bg-[#1a1f2f]/40 backdrop-blur-3xl fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-md rounded-full border border-white/10 shadow-[0px_24px_48px_rgba(0,0,0,0.4)] animate-[staggered-3d-entrance_0.4s_ease-out]">
+<a class="flex items-center justify-center text-[#dee1f7] w-12 h-12 hover:bg-white/20 rounded-full transition-all" href="#">
+<span class="material-symbols-outlined">home</span>
+</a>
+<a class="flex items-center justify-center text-[#dee1f7] w-12 h-12 hover:bg-white/20 rounded-full transition-all" href="#">
+<span class="material-symbols-outlined">radar</span>
+</a>
+<a class="flex items-center justify-center text-[#dee1f7] w-12 h-12 hover:bg-white/20 rounded-full transition-all" href="#">
+<span class="material-symbols-outlined">air</span>
+</a>
+<a class="flex items-center justify-center bg-white dark:bg-[#dee1f7] text-[#0e1322] rounded-full w-12 h-12 shadow-[0_0_15px_rgba(255,255,255,0.5)]" href="#">
+<span class="material-symbols-outlined">more_horiz</span>
+</a>
+</nav>
+</body></html>
