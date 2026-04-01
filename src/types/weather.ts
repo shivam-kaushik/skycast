@@ -59,12 +59,13 @@ export interface AirQualityData {
     pm25: number[]
     no2: number[]
     ozone: number[]
-    alderPollen: number[]
-    birchPollen: number[]
-    grassPollen: number[]
-    mugwortPollen: number[]
-    olivePollen: number[]
-    ragweedPollen: number[]
+    /** Open-Meteo uses `null` where the CAMS pollen model has no coverage. */
+    alderPollen: (number | null)[]
+    birchPollen: (number | null)[]
+    grassPollen: (number | null)[]
+    mugwortPollen: (number | null)[]
+    olivePollen: (number | null)[]
+    ragweedPollen: (number | null)[]
   }
 }
 

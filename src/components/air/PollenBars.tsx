@@ -1,9 +1,8 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import GlassCard from '@/src/components/shared/GlassCard'
-import SectionLabel from '@/src/components/shared/SectionLabel'
 import { describePollenLevel } from '@/src/utils/weatherDescriptions'
-import { TEXT_PRIMARY, TEXT_SECONDARY, GOOD, WARNING, DANGER } from '@/src/theme/colors'
+import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, GOOD, WARNING, DANGER } from '@/src/theme/colors'
 import type { AirQualityData } from '@/src/types/weather'
 
 interface PollenBarsProps {
@@ -12,7 +11,15 @@ interface PollenBarsProps {
 }
 
 interface PollenType {
-  key: keyof AirQualityData['hourly']
+  key: keyof Pick<
+    AirQualityData['hourly'],
+    | 'grassPollen'
+    | 'birchPollen'
+    | 'ragweedPollen'
+    | 'alderPollen'
+    | 'olivePollen'
+    | 'mugwortPollen'
+  >
   label: string
 }
 
@@ -26,33 +33,71 @@ const POLLEN_TYPES: PollenType[] = [
 ]
 
 const LEVEL_COLORS: Record<string, string> = {
-  None: 'rgba(255,255,255,0.15)',
+  None: TEXT_TERTIARY,
   Low: GOOD,
   Moderate: WARNING,
   High: DANGER,
   'Very High': '#C0392B',
 }
 
+const BAR_FILL_NONE = 'rgba(255,255,255,0.12)'
+
 const LEVEL_MAX = 100
 
+function pollenAt(hourly: AirQualityData['hourly'], key: PollenType['key'], idx: number): number | null {
+  const arr = hourly[key]
+  const v = arr[idx]
+  if (v === null || v === undefined) return null
+  if (typeof v !== 'number' || Number.isNaN(v)) return null
+  return v
+}
+
 export default function PollenBars({ hourly, currentHourIdx }: PollenBarsProps) {
+  const safeIdx = Math.min(Math.max(currentHourIdx, 0), Math.max(hourly.time.length - 1, 0))
+
+  const samples = POLLEN_TYPES.map(({ key }) => pollenAt(hourly, key, safeIdx))
+  const allMissing = samples.every((s) => s === null)
+
+  if (allMissing) {
+    return (
+      <GlassCard style={styles.card}>
+        <Text style={styles.unavailableTitle}>No pollen data here</Text>
+        <Text style={styles.unavailableBody}>
+          Open-Meteo&apos;s pollen model mainly covers Europe. Other regions often return empty values —
+          try a European city to verify the chart.
+        </Text>
+      </GlassCard>
+    )
+  }
+
   return (
     <GlassCard style={styles.card}>
-      <SectionLabel text="Pollen" />
       <View style={styles.list}>
         {POLLEN_TYPES.map(({ key, label }) => {
-          const rawVal = hourly[key] as number[]
-          const value = rawVal[currentHourIdx] ?? 0
-          const level = describePollenLevel(value)
+          const grains = pollenAt(hourly, key, safeIdx)
+          if (grains === null) {
+            return (
+              <View key={label} style={styles.row}>
+                <Text style={styles.pollenLabel}>{label}</Text>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barRow, styles.barUnavailable]} />
+                </View>
+                <Text style={[styles.levelText, styles.unavailableCell]}>—</Text>
+              </View>
+            )
+          }
+
+          const level = describePollenLevel(grains)
           const color = LEVEL_COLORS[level] ?? GOOD
-          const barFlex = Math.min(Math.round(value), LEVEL_MAX)
+          const barFlex = Math.min(Math.round(grains), LEVEL_MAX)
+          const fillColor = level === 'None' ? BAR_FILL_NONE : color
 
           return (
             <View key={label} style={styles.row}>
               <Text style={styles.pollenLabel}>{label}</Text>
               <View style={styles.barTrack}>
                 <View style={styles.barRow}>
-                  <View style={{ flex: barFlex, backgroundColor: color, borderRadius: 3 }} />
+                  <View style={{ flex: barFlex, backgroundColor: fillColor, borderRadius: 3 }} />
                   <View style={{ flex: Math.max(LEVEL_MAX - barFlex, 0) }} />
                 </View>
               </View>
@@ -70,6 +115,17 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 16,
     gap: 12,
+  },
+  unavailableTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TEXT_PRIMARY,
+  },
+  unavailableBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: TEXT_SECONDARY,
+    marginTop: 6,
   },
   list: {
     gap: 10,
@@ -95,9 +151,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
+  barUnavailable: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
   levelText: {
     fontSize: 12,
-    width: 60,
+    width: 72,
     textAlign: 'right',
+  },
+  unavailableCell: {
+    color: TEXT_TERTIARY,
   },
 })

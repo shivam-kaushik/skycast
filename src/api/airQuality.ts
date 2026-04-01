@@ -17,12 +17,12 @@ interface AirQualityHourlyRaw {
   pm2_5: number[]
   nitrogen_dioxide: number[]
   ozone: number[]
-  alder_pollen: number[]
-  birch_pollen: number[]
-  grass_pollen: number[]
-  mugwort_pollen: number[]
-  olive_pollen: number[]
-  ragweed_pollen: number[]
+  alder_pollen: (number | null)[]
+  birch_pollen: (number | null)[]
+  grass_pollen: (number | null)[]
+  mugwort_pollen: (number | null)[]
+  olive_pollen: (number | null)[]
+  ragweed_pollen: (number | null)[]
 }
 
 interface AirQualityApiResponse {
