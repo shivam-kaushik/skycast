@@ -26,6 +26,22 @@ interface MapsCoResult {
   lon?: string
 }
 
+interface PhotonFeature {
+  geometry?: {
+    coordinates?: unknown
+  }
+  properties?: {
+    name?: string
+    city?: string
+    state?: string
+    country?: string
+  }
+}
+
+interface PhotonResponse {
+  features?: PhotonFeature[]
+}
+
 function dedupeResults(results: LocationSearchResult[]): LocationSearchResult[] {
   const seen = new Set<string>()
   const out: LocationSearchResult[] = []
@@ -96,6 +112,39 @@ async function searchMapsCo(query: string): Promise<LocationSearchResult[]> {
   return mapped.filter((item): item is LocationSearchResult => item !== null)
 }
 
+async function searchPhoton(query: string): Promise<LocationSearchResult[]> {
+  const endpoint = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`
+  const response = await fetch(endpoint)
+  if (!response.ok) {
+    throw new Error(`Photon search failed (${response.status})`)
+  }
+  const json = (await response.json()) as PhotonResponse
+  const features = Array.isArray(json.features) ? json.features : []
+  const mapped: Array<LocationSearchResult | null> = features.map((feature, idx) => {
+    const coordinates = feature.geometry?.coordinates
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return null
+    const lon = Number(coordinates[0])
+    const lat = Number(coordinates[1])
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+
+    const props = feature.properties
+    const cityName = String(props?.name ?? props?.city ?? '').trim()
+    if (!cityName) return null
+    const admin1 = props?.state
+    const country = props?.country
+
+    return {
+      id: `photon-${cityName}-${lat}-${lon}-${idx}`,
+      cityName,
+      lat,
+      lon,
+      country,
+      admin1,
+    }
+  })
+  return mapped.filter((item): item is LocationSearchResult => item !== null)
+}
+
 export async function searchLocations(query: string): Promise<LocationSearchResult[]> {
   const trimmed = query.trim()
   if (trimmed.length < 2) return []
@@ -109,6 +158,15 @@ export async function searchLocations(query: string): Promise<LocationSearchResu
     // Fallback handled below.
   }
 
-  const fallback = await searchMapsCo(trimmed)
-  return dedupeResults(fallback)
+  try {
+    const fallbackMaps = await searchMapsCo(trimmed)
+    if (fallbackMaps.length > 0) {
+      return dedupeResults(fallbackMaps)
+    }
+  } catch (_) {
+    // Second fallback below.
+  }
+
+  const fallbackPhoton = await searchPhoton(trimmed)
+  return dedupeResults(fallbackPhoton)
 }
