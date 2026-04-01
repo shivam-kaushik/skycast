@@ -28,10 +28,15 @@ interface LocationStore {
   lat: number | null
   lon: number | null
   cityName: string
+  /** Last known GPS fix (updated whenever we successfully read device location). */
+  deviceLat: number | null
+  deviceLon: number | null
+  deviceCityName: string
   isManualSelection: boolean
   savedLocations: SavedLocation[]
   recentLocationIds: string[]
   setLocation: (lat: number, lon: number, cityName: string) => void
+  recordDeviceLocation: (lat: number, lon: number, cityName: string) => void
   selectManualLocation: (location: Omit<SavedLocation, 'isFavorite' | 'lastSelectedAt'>) => void
   useDeviceLocation: () => void
   toggleFavorite: (id: string) => void
@@ -74,6 +79,9 @@ export const useLocationStore = create<LocationStore>()(
       lat: null,
       lon: null,
       cityName: '',
+      deviceLat: null,
+      deviceLon: null,
+      deviceCityName: '',
       isManualSelection: false,
       savedLocations: [],
       recentLocationIds: [],
@@ -83,6 +91,12 @@ export const useLocationStore = create<LocationStore>()(
             return state
           }
           return { lat, lon, cityName }
+        }),
+      recordDeviceLocation: (lat, lon, cityName) =>
+        set({
+          deviceLat: lat,
+          deviceLon: lon,
+          deviceCityName: cityName,
         }),
       selectManualLocation: (location) =>
         set((state) => {
@@ -101,9 +115,17 @@ export const useLocationStore = create<LocationStore>()(
           }
         }),
       useDeviceLocation: () =>
-        set(() => ({
-          isManualSelection: false,
-        })),
+        set((state) => {
+          if (state.deviceLat !== null && state.deviceLon !== null) {
+            return {
+              isManualSelection: false,
+              lat: state.deviceLat,
+              lon: state.deviceLon,
+              cityName: state.deviceCityName || 'Your Location',
+            }
+          }
+          return { isManualSelection: false }
+        }),
       toggleFavorite: (id) =>
         set((state) => ({
           savedLocations: state.savedLocations.map((entry) =>
@@ -118,6 +140,9 @@ export const useLocationStore = create<LocationStore>()(
         lat: state.lat,
         lon: state.lon,
         cityName: state.cityName,
+        deviceLat: state.deviceLat,
+        deviceLon: state.deviceLon,
+        deviceCityName: state.deviceCityName,
         isManualSelection: state.isManualSelection,
         savedLocations: state.savedLocations,
         recentLocationIds: state.recentLocationIds,

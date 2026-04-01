@@ -14,6 +14,7 @@ export function useLocation(): UseLocationResult {
   const [permissionDenied, setPermissionDenied] = useState(false)
 
   const setLocation = useLocationStore((state) => state.setLocation)
+  const recordDeviceLocation = useLocationStore((state) => state.recordDeviceLocation)
   const isManualSelection = useLocationStore((state) => state.isManualSelection)
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export function useLocation(): UseLocationResult {
           'Unknown Location'
 
         if (!cancelled) {
+          recordDeviceLocation(latitude, longitude, cityName)
           setLocation(latitude, longitude, cityName)
           setPermissionDenied(false)
           setError(null)
@@ -83,7 +85,7 @@ export function useLocation(): UseLocationResult {
     return () => {
       cancelled = true
     }
-  }, [isManualSelection, setLocation])
+  }, [isManualSelection, recordDeviceLocation, setLocation])
 
   return { loading, error, permissionDenied }
 }

@@ -6,6 +6,9 @@ describe('locationStore', () => {
       lat: null,
       lon: null,
       cityName: '',
+      deviceLat: null,
+      deviceLon: null,
+      deviceCityName: '',
       isManualSelection: false,
       savedLocations: [],
       recentLocationIds: [],
@@ -32,6 +35,9 @@ describe('locationStore', () => {
       lat: null,
       lon: null,
       cityName: '',
+      deviceLat: null,
+      deviceLon: null,
+      deviceCityName: '',
       isManualSelection: false,
       savedLocations: [],
       recentLocationIds: [],
@@ -50,5 +56,26 @@ describe('locationStore', () => {
     const state = useLocationStore.getState()
     expect(state.recentLocationIds[0]).toBe('london')
     expect(state.savedLocations.find((item) => item.id === 'london')?.isFavorite).toBe(true)
+  })
+
+  it('useDeviceLocation restores last GPS snapshot and clears manual mode', () => {
+    useLocationStore.setState({
+      lat: 51.5,
+      lon: -0.12,
+      cityName: 'London',
+      deviceLat: 43.65,
+      deviceLon: -79.38,
+      deviceCityName: 'Toronto',
+      isManualSelection: true,
+      savedLocations: [],
+      recentLocationIds: [],
+    })
+
+    useLocationStore.getState().useDeviceLocation()
+    const state = useLocationStore.getState()
+    expect(state.isManualSelection).toBe(false)
+    expect(state.cityName).toBe('Toronto')
+    expect(state.lat).toBeCloseTo(43.65)
+    expect(state.lon).toBeCloseTo(-79.38)
   })
 })

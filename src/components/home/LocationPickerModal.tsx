@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -19,7 +20,8 @@ import { ACCENT, BG, GLASS_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY }
 
 interface LocationPickerModalProps {
   visible: boolean
-  currentCityName: string
+  /** Label for the last known GPS place (not the manually selected city). */
+  deviceCityName: string
   savedLocations: SavedLocation[]
   recentLocationIds: string[]
   onClose: () => void
@@ -41,7 +43,7 @@ function toSearchResult(location: SavedLocation): LocationSearchResult {
 
 export default function LocationPickerModal({
   visible,
-  currentCityName,
+  deviceCityName,
   savedLocations,
   recentLocationIds,
   onClose,
@@ -54,6 +56,8 @@ export default function LocationPickerModal({
   const [searchResults, setSearchResults] = useState<LocationSearchResult[]>([])
   const [searchError, setSearchError] = useState<string | null>(null)
   const latestRequestIdRef = useRef(0)
+  const { height: windowHeight } = useWindowDimensions()
+  const listMaxHeight = Math.max(220, Math.round(windowHeight * 0.48))
 
   const runSearch = (rawQuery: string): void => {
     const normalized = rawQuery.trim()
@@ -146,10 +150,11 @@ export default function LocationPickerModal({
           </GlassCard>
 
           <ScrollView
-            style={styles.list}
+            style={[styles.list, { maxHeight: listMaxHeight }]}
             contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
           >
             <Pressable
               style={styles.deviceRow}
@@ -162,7 +167,9 @@ export default function LocationPickerModal({
                 <Ionicons name="locate" size={16} color={ACCENT} />
                 <View>
                   <Text style={styles.locationName}>Use current location</Text>
-                  <Text style={styles.locationMeta}>{currentCityName || 'Detected from GPS'}</Text>
+                  <Text style={styles.locationMeta}>
+                    {deviceCityName.trim() || 'Your GPS location'}
+                  </Text>
                 </View>
               </View>
             </Pressable>
@@ -287,6 +294,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
+    width: '100%',
     maxHeight: '85%',
     backgroundColor: BG,
     borderTopLeftRadius: 24,
@@ -333,9 +341,10 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   list: {
-    flex: 1,
+    flexGrow: 0,
   },
   listContent: {
+    flexGrow: 1,
     paddingBottom: 28,
   },
   deviceRow: {

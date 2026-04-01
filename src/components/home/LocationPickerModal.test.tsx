@@ -8,7 +8,7 @@ describe('LocationPickerModal', () => {
       .create(
         <LocationPickerModal
           visible={false}
-          currentCityName="Toronto"
+          deviceCityName="Toronto"
           savedLocations={[]}
           recentLocationIds={[]}
           onClose={() => {}}

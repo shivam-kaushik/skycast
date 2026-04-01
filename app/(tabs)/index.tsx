@@ -35,7 +35,8 @@ import {
 type IoniconName = ComponentProps<typeof Ionicons>['name']
 
 export default function HomeScreen() {
-  const { lat, lon, cityName, savedLocations, recentLocationIds } = useLocationStore()
+  const { lat, lon, cityName, deviceCityName, savedLocations, recentLocationIds } =
+    useLocationStore()
   const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
   const useDeviceLocation = useLocationStore((s) => s.useDeviceLocation)
   const toggleFavorite = useLocationStore((s) => s.toggleFavorite)
@@ -168,7 +169,7 @@ export default function HomeScreen() {
       </ScrollView>
       <LocationPickerModal
         visible={isPickerOpen}
-        currentCityName={cityName}
+        deviceCityName={deviceCityName}
         savedLocations={savedLocations}
         recentLocationIds={recentLocationIds}
         onClose={() => setPickerOpen(false)}
