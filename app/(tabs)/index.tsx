@@ -151,11 +151,11 @@ export default function HomeScreen() {
 
         <View style={styles.spacer} />
 
-        {/* 7-day forecast */}
+        {/* 14-day forecast */}
         <View style={styles.sectionHeader}>
-          <SectionLabel text="7-Day Forecast" />
+          <SectionLabel text="14-Day Forecast" />
         </View>
-        <ForecastList daily={daily} unit={unit} days={7} />
+        <ForecastList daily={daily} unit={unit} days={14} />
 
         <View style={styles.spacer} />
 

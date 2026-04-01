@@ -7,6 +7,7 @@ import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, ACCENT } from '@/src/theme
 import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { formatTemp } from '@/src/utils/formatTemp'
 import type { DailyWeather } from '@/src/types/weather'
+import { getForecastDayLabel } from '@/src/utils/forecastDayLabel'
 
 type IoniconName = ComponentProps<typeof Ionicons>['name']
 
@@ -14,17 +15,6 @@ interface ForecastListProps {
   daily: DailyWeather
   unit: 'C' | 'F'
   days?: number
-}
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-function getDayLabel(dateStr: string, index: number): string {
-  if (index === 0) return 'Today'
-  if (index === 1) return 'Tomorrow'
-  // Parse date without timezone issues
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const d = new Date(year ?? 2024, (month ?? 1) - 1, day ?? 1)
-  return DAY_NAMES[d.getDay()] ?? dateStr.slice(5)
 }
 
 export default function ForecastList({ daily, unit, days = 7 }: ForecastListProps) {
@@ -42,7 +32,7 @@ export default function ForecastList({ daily, unit, days = 7 }: ForecastListProp
 
         return (
           <View key={date} style={[styles.row, !isLast && styles.rowBorder]}>
-            <Text style={styles.dayLabel}>{getDayLabel(date, i)}</Text>
+            <Text style={styles.dayLabel}>{getForecastDayLabel(date, i)}</Text>
             <View style={styles.conditionCell}>
               <Ionicons name={ionicon as IoniconName} size={18} color={TEXT_SECONDARY} />
               {precipProb > 20 && (

@@ -42,6 +42,15 @@ export interface DailyWeather {
   sunset: string[]
 }
 
+/** Reanalysis daily series from Open-Meteo ERA5 (archive-api). */
+export interface Era5DailyWeather {
+  time: string[]
+  tempMax: number[]
+  tempMin: number[]
+  precipitationSum: number[]
+  windSpeedMax: number[]
+}
+
 export interface AirQualityData {
   current: {
     pm10: number

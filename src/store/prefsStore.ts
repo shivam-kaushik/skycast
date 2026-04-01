@@ -3,6 +3,7 @@ import { create } from 'zustand'
 interface AlertsEnabled {
   rain: boolean
   uv: boolean
+  wind: boolean
   pollen: boolean
   severe: boolean
 }
@@ -26,6 +27,7 @@ export const usePrefsStore = create<PrefsStore>((set) => ({
   alertsEnabled: {
     rain: true,
     uv: true,
+    wind: true,
     pollen: true,
     severe: true,
   },
@@ -33,10 +35,15 @@ export const usePrefsStore = create<PrefsStore>((set) => ({
   setThreshold: (key, value) =>
     set((state) => ({ ...state, [key]: value })),
   toggleAlert: (key) =>
-    set((state) => ({
-      alertsEnabled: {
-        ...state.alertsEnabled,
-        [key]: !state.alertsEnabled[key as keyof AlertsEnabled],
-      },
-    })),
+    set((state) => {
+      const k = key as keyof AlertsEnabled
+      const prev = state.alertsEnabled[k]
+      const current = typeof prev === 'boolean' ? prev : false
+      return {
+        alertsEnabled: {
+          ...state.alertsEnabled,
+          [k]: !current,
+        },
+      }
+    }),
 }))

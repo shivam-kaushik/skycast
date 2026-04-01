@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import {
   View,
   Text,
@@ -16,10 +16,15 @@ import { format } from 'date-fns'
 import { useLocationStore } from '@/src/store/locationStore'
 import { usePrefsStore } from '@/src/store/prefsStore'
 import { useWeather } from '@/src/hooks/useWeather'
+import { useAirQuality } from '@/src/hooks/useAirQuality'
+import { useEra5History } from '@/src/hooks/useEra5History'
 import { useLocation } from '@/src/hooks/useLocation'
 import GlassCard from '@/src/components/shared/GlassCard'
 import ActivityScoreRow from '@/src/components/activities/ActivityScoreRow'
 import SectionLabel from '@/src/components/shared/SectionLabel'
+import HealthInsightsCard from '@/src/components/more/HealthInsightsCard'
+import HistoryBriefCard from '@/src/components/more/HistoryBriefCard'
+import ActivityWeekOutlook from '@/src/components/more/ActivityWeekOutlook'
 import {
   scoreRunning,
   scoreCycling,
@@ -32,6 +37,13 @@ import {
   scoreBBQ,
   scoreDogWalking,
 } from '@/src/utils/activityScores'
+import { buildSevenDayActivityOutlook } from '@/src/utils/activityWeekOutlook'
+import { buildHistoryBrief } from '@/src/utils/historyBrief'
+import {
+  airQualityHourIndex,
+  buildHealthInsights,
+  maxPollenLevelAtHour,
+} from '@/src/utils/healthInsights'
 import type { ActivityScore } from '@/src/types/weather'
 import {
   BG,
@@ -64,10 +76,25 @@ const ACTIVITIES: ActivityConfig[] = [
   { key: 'dogWalking', name: 'Dog Walking', icon: 'paw-outline', scorer: scoreDogWalking },
 ]
 
+const ALERT_ROWS = [
+  { key: 'rain' as const, label: 'Rain Alert', icon: 'rainy-outline' as const, thresholdKey: 'rain' as const },
+  { key: 'uv' as const, label: 'UV Alert', icon: 'sunny-outline' as const, thresholdKey: 'uv' as const },
+  { key: 'wind' as const, label: 'Wind Alert', icon: 'speedometer-outline' as const, thresholdKey: 'wind' as const },
+  { key: 'pollen' as const, label: 'Pollen Alert', icon: 'flower-outline' as const, thresholdKey: 'pollen' as const },
+  { key: 'severe' as const, label: 'Severe Weather', icon: 'thunderstorm-outline' as const, thresholdKey: 'severe' as const },
+]
+
 export default function MoreScreen() {
   useLocation()
   const { lat, lon } = useLocationStore()
-  const { data: weather, isLoading } = useWeather(lat, lon)
+  const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
+  const { data: airQuality } = useAirQuality(lat, lon)
+  const {
+    data: era5,
+    isLoading: eraLoading,
+    error: era5Error,
+  } = useEra5History(lat, lon)
+
   const unit = usePrefsStore((s) => s.unit)
   const setUnit = usePrefsStore((s) => s.setUnit)
   const rainThreshold = usePrefsStore((s) => s.rainThreshold)
@@ -77,6 +104,26 @@ export default function MoreScreen() {
   const toggleAlert = usePrefsStore((s) => s.toggleAlert)
 
   const today = format(new Date(), 'yyyy-MM-dd')
+
+  const healthLines = useMemo(() => {
+    if (!weather) return []
+    const hourIdx = airQuality ? airQualityHourIndex(airQuality.hourly.time) : 0
+    const pollen = airQuality ? maxPollenLevelAtHour(airQuality.hourly, hourIdx) : 'unavailable'
+    return buildHealthInsights(weather.current, airQuality?.current ?? null, pollen)
+  }, [weather, airQuality])
+
+  const activityWeek = useMemo(
+    () => (weather ? buildSevenDayActivityOutlook(weather.hourly, weather.daily) : []),
+    [weather],
+  )
+
+  const historyBrief = useMemo(() => {
+    if (!era5 || !weather) return null
+    return buildHistoryBrief(era5, weather.daily, unit)
+  }, [era5, weather, unit])
+
+  const era5ErrorMessage =
+    era5Error instanceof Error ? era5Error.message : era5Error != null ? 'Could not load history.' : null
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -90,13 +137,51 @@ export default function MoreScreen() {
           <Text style={styles.title}>More</Text>
         </View>
 
-        {/* Activities */}
+        {/* Health correlations */}
+        <View style={styles.sectionHeader}>
+          <SectionLabel text="Health & comfort" />
+        </View>
+        {weatherLoading || !weather ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={styles.loadingText}>Loading conditions…</Text>
+          </View>
+        ) : (
+          <HealthInsightsCard lines={healthLines} />
+        )}
+
+        <View style={styles.spacer} />
+
+        {/* 7-day activity outlook */}
+        <View style={styles.sectionHeader}>
+          <SectionLabel text="7-Day Activity Outlook" />
+        </View>
+        {weatherLoading || !weather ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={styles.loadingText}>Loading forecast…</Text>
+          </View>
+        ) : (
+          <ActivityWeekOutlook days={activityWeek} />
+        )}
+
+        <View style={styles.spacer} />
+
+        <HistoryBriefCard
+          isLoading={eraLoading}
+          errorMessage={era5ErrorMessage}
+          brief={historyBrief}
+        />
+
+        <View style={styles.spacer} />
+
+        {/* Today's activities */}
         <View style={styles.sectionHeader}>
           <SectionLabel text="Today's Activities" />
         </View>
         <GlassCard style={styles.activitiesCard}>
-          {isLoading || !weather ? (
-            <View style={styles.loadingRow}>
+          {weatherLoading || !weather ? (
+            <View style={styles.loadingRowInset}>
               <ActivityIndicator size="small" color={ACCENT} />
               <Text style={styles.loadingText}>Computing activity scores…</Text>
             </View>
@@ -124,7 +209,6 @@ export default function MoreScreen() {
           <SectionLabel text="Settings" />
         </View>
         <GlassCard style={styles.settingsCard}>
-          {/* Unit toggle */}
           <View style={styles.settingRow}>
             <Ionicons name="thermometer-outline" size={20} color={TEXT_SECONDARY} />
             <Text style={styles.settingLabel}>Temperature Unit</Text>
@@ -152,23 +236,22 @@ export default function MoreScreen() {
           <SectionLabel text="Alerts" />
         </View>
         <GlassCard style={styles.settingsCard}>
-          {(
-            [
-              { key: 'rain', label: 'Rain Alert', icon: 'rainy-outline', desc: `>${rainThreshold}% probability` },
-              { key: 'uv', label: 'UV Alert', icon: 'sunny-outline', desc: `UV index >${uvThreshold}` },
-              { key: 'wind', label: 'Wind Alert', icon: 'speedometer-outline', desc: `>${windThreshold} km/h` },
-              { key: 'severe', label: 'Severe Weather', icon: 'thunderstorm-outline', desc: 'Thunderstorms & extreme events' },
-            ] as const
-          ).map(({ key, label, icon, desc }, i, arr) => (
+          {ALERT_ROWS.map(({ key, label, icon, thresholdKey }, i, arr) => (
             <View key={key} style={[styles.alertRow, i < arr.length - 1 && styles.alertRowBorder]}>
-              <Ionicons name={icon as IoniconName} size={18} color={TEXT_SECONDARY} />
+              <Ionicons name={icon} size={18} color={TEXT_SECONDARY} />
               <View style={styles.alertInfo}>
                 <Text style={styles.alertLabel}>{label}</Text>
-                <Text style={styles.alertDesc}>{desc}</Text>
+                <Text style={styles.alertDesc}>
+                  {thresholdKey === 'rain' && `>${rainThreshold}% probability`}
+                  {thresholdKey === 'uv' && `UV index >${uvThreshold}`}
+                  {thresholdKey === 'wind' && `>${windThreshold} km/h gusts`}
+                  {thresholdKey === 'pollen' && 'Moderate or higher pollen in forecast'}
+                  {thresholdKey === 'severe' && 'Thunderstorms & extreme events'}
+                </Text>
               </View>
               <Switch
-                value={alertsEnabled[key === 'wind' ? 'rain' : key] ?? false}
-                onValueChange={() => toggleAlert(key === 'wind' ? 'rain' : key)}
+                value={alertsEnabled[key]}
+                onValueChange={() => toggleAlert(key)}
                 trackColor={{ false: 'rgba(255,255,255,0.15)', true: ACCENT }}
                 thumbColor="#fff"
               />
@@ -176,7 +259,6 @@ export default function MoreScreen() {
           ))}
         </GlassCard>
 
-        {/* About */}
         <View style={styles.aboutRow}>
           <Ionicons name="information-circle-outline" size={14} color={TEXT_TERTIARY} />
           <Text style={styles.aboutText}>
@@ -220,16 +302,14 @@ const styles = StyleSheet.create({
   bottomPad: {
     height: 32,
   },
-  activitiesCard: {
-    marginHorizontal: 16,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  lastRow: {
-    borderBottomWidth: 0,
-  },
   loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  loadingRowInset: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -238,6 +318,15 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     color: TEXT_SECONDARY,
+  },
+  activitiesCard: {
+    marginHorizontal: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  lastRow: {
+    borderBottomWidth: 0,
   },
   settingsCard: {
     marginHorizontal: 16,
