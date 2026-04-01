@@ -99,10 +99,12 @@ export function buildMapHTML(
   var WIND_VECTOR_SOURCE_URL = ${params.windVectorSourceUrl ? `'${params.windVectorSourceUrl}'` : 'null'};
   var WIND_VECTOR_VALID_TIMES_COUNT = ${params.windVectorValidTimesLength ?? params.tileValidTimesLength};
   var MAX_FRAMES = 8;
+  var OM_MAX_NATIVE_ZOOM = 12;
 
   var map = L.map('map', {
     center: [LAT, LON],
     zoom: 9,
+    maxZoom: 19,
     zoomControl: false,
     attributionControl: false,
     preferCanvas: true
@@ -251,6 +253,8 @@ export function buildMapHTML(
       var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
         opacity: i === 0 ? (LAYER === 'wind' ? 0.56 : (LAYER === 'temperature' ? 0.86 : 0.66)) : 0,
+        maxNativeZoom: OM_MAX_NATIVE_ZOOM,
+        maxZoom: 19,
         zIndex: 10,
         pane: 'dataPane',
       });
@@ -265,6 +269,8 @@ export function buildMapHTML(
         var vecOmUrl = WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
         var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, {
           opacity: k === 0 ? 0.88 : 0,
+          maxNativeZoom: OM_MAX_NATIVE_ZOOM,
+          maxZoom: 19,
           zIndex: 11,
           pane: 'vectorPane',
           style: function(properties, layerName) {
@@ -301,6 +307,8 @@ export function buildMapHTML(
         var omCloudUrl = CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
         var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
           opacity: j === 0 ? cloudActiveOpacity : 0,
+          maxNativeZoom: OM_MAX_NATIVE_ZOOM,
+          maxZoom: 19,
           zIndex: 9,
           pane: 'cloudPane',
         });
@@ -459,6 +467,7 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
   var map = L.map('map', {
     center: [LAT, LON],
     zoom: 8,
+    maxZoom: 19,
     zoomControl: false,
     attributionControl: false,
     preferCanvas: true

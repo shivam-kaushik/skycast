@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import DailyBriefCard from '@/src/components/home/DailyBriefCard'
 import HourlyStrip from '@/src/components/home/HourlyStrip'
 import ForecastList from '@/src/components/home/ForecastList'
 import MetricTilesGrid from '@/src/components/home/MetricTilesGrid'
+import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 import SectionLabel from '@/src/components/shared/SectionLabel'
 import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { formatTemp } from '@/src/utils/formatTemp'
@@ -34,10 +35,14 @@ import {
 type IoniconName = ComponentProps<typeof Ionicons>['name']
 
 export default function HomeScreen() {
-  const { lat, lon, cityName } = useLocationStore()
+  const { lat, lon, cityName, savedLocations, recentLocationIds } = useLocationStore()
+  const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
+  const useDeviceLocation = useLocationStore((s) => s.useDeviceLocation)
+  const toggleFavorite = useLocationStore((s) => s.toggleFavorite)
   const { loading: locationLoading, error: locationError, permissionDenied } = useLocation()
   const unit = usePrefsStore((s) => s.unit)
   const setUnit = usePrefsStore((s) => s.setUnit)
+  const [isPickerOpen, setPickerOpen] = useState(false)
 
   const { data: weather, isLoading: weatherLoading, error: weatherError, refetch } = useWeather(lat, lon)
 
@@ -99,10 +104,11 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.locationRow}>
+          <TouchableOpacity style={styles.locationRow} onPress={() => setPickerOpen(true)}>
             <Ionicons name="location-sharp" size={16} color={ACCENT} />
             <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
-          </View>
+            <Ionicons name="chevron-down" size={14} color={TEXT_TERTIARY} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setUnit(unit === 'C' ? 'F' : 'C')}
             style={styles.unitToggle}
@@ -160,6 +166,18 @@ export default function HomeScreen() {
 
         <View style={styles.bottomPad} />
       </ScrollView>
+      <LocationPickerModal
+        visible={isPickerOpen}
+        currentCityName={cityName}
+        savedLocations={savedLocations}
+        recentLocationIds={recentLocationIds}
+        onClose={() => setPickerOpen(false)}
+        onUseDeviceLocation={useDeviceLocation}
+        onToggleFavorite={toggleFavorite}
+        onSelectLocation={(location) => {
+          selectManualLocation(location)
+        }}
+      />
     </SafeAreaView>
   )
 }

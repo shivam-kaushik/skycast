@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -6,12 +6,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   StatusBar,
+  Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocationStore } from '@/src/store/locationStore'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useLocation } from '@/src/hooks/useLocation'
+import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 import AQIGauge from '@/src/components/air/AQIGauge'
 import PollenBars from '@/src/components/air/PollenBars'
 import PollutantList from '@/src/components/air/PollutantList'
@@ -28,7 +30,11 @@ function getCurrentHourIdx(times: string[]): number {
 
 export default function AirScreen() {
   useLocation()
-  const { lat, lon, cityName } = useLocationStore()
+  const { lat, lon, cityName, savedLocations, recentLocationIds } = useLocationStore()
+  const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
+  const useDeviceLocation = useLocationStore((s) => s.useDeviceLocation)
+  const toggleFavorite = useLocationStore((s) => s.toggleFavorite)
+  const [isPickerOpen, setPickerOpen] = useState(false)
   const { data: airQuality, isLoading } = useAirQuality(lat, lon)
 
   if (isLoading || !airQuality) {
@@ -55,10 +61,11 @@ export default function AirScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Air Quality</Text>
-          <View style={styles.locationRow}>
+          <Pressable style={styles.locationRow} onPress={() => setPickerOpen(true)}>
             <Ionicons name="location-sharp" size={13} color={ACCENT} />
             <Text style={styles.locationText}>{cityName || 'Your Location'}</Text>
-          </View>
+            <Ionicons name="chevron-down" size={12} color={TEXT_TERTIARY} />
+          </Pressable>
         </View>
 
         {/* AQI badge */}
@@ -100,6 +107,19 @@ export default function AirScreen() {
 
         <View style={styles.bottomPad} />
       </ScrollView>
+
+      <LocationPickerModal
+        visible={isPickerOpen}
+        currentCityName={cityName}
+        savedLocations={savedLocations}
+        recentLocationIds={recentLocationIds}
+        onClose={() => setPickerOpen(false)}
+        onUseDeviceLocation={useDeviceLocation}
+        onToggleFavorite={toggleFavorite}
+        onSelectLocation={(location) => {
+          selectManualLocation(location)
+        }}
+      />
     </SafeAreaView>
   )
 }

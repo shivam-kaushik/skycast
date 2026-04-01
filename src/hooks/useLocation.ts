@@ -14,12 +14,25 @@ export function useLocation(): UseLocationResult {
   const [permissionDenied, setPermissionDenied] = useState(false)
 
   const setLocation = useLocationStore((state) => state.setLocation)
+  const isManualSelection = useLocationStore((state) => state.isManualSelection)
 
   useEffect(() => {
     let cancelled = false
 
     async function fetchLocation(): Promise<void> {
       try {
+        if (!cancelled) {
+          setPermissionDenied(false)
+          setError(null)
+        }
+
+        if (isManualSelection) {
+          if (!cancelled) {
+            setLoading(false)
+          }
+          return
+        }
+
         const { status } = await Location.requestForegroundPermissionsAsync()
 
         if (status !== 'granted') {
@@ -52,6 +65,8 @@ export function useLocation(): UseLocationResult {
 
         if (!cancelled) {
           setLocation(latitude, longitude, cityName)
+          setPermissionDenied(false)
+          setError(null)
           setLoading(false)
         }
       } catch (err) {
@@ -68,7 +83,7 @@ export function useLocation(): UseLocationResult {
     return () => {
       cancelled = true
     }
-  }, [setLocation])
+  }, [isManualSelection, setLocation])
 
   return { loading, error, permissionDenied }
 }

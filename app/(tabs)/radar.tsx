@@ -18,6 +18,7 @@ import { useLocation } from '@/src/hooks/useLocation'
 import WeatherMapView from '@/src/components/radar/WeatherMapView'
 import type { MapLayer, WeatherMapHandle } from '@/src/components/radar/WeatherMapView'
 import RadarLegend from '@/src/components/radar/RadarLegend'
+import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 import {
   BG,
   TEXT_PRIMARY,
@@ -71,7 +72,10 @@ const LAYERS: LayerConfig[] = [
 
 export default function RadarScreen() {
   useLocation()
-  const { lat, lon, cityName } = useLocationStore()
+  const { lat, lon, cityName, savedLocations, recentLocationIds } = useLocationStore()
+  const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
+  const useDeviceLocation = useLocationStore((s) => s.useDeviceLocation)
+  const toggleFavorite = useLocationStore((s) => s.toggleFavorite)
   const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
   const { data: airQuality, isLoading: aqLoading } = useAirQuality(lat, lon)
 
@@ -80,6 +84,7 @@ export default function RadarScreen() {
   const [frameIndex, setFrameIndex] = useState(0)
   const [totalFrames, setTotalFrames] = useState(0)
   const [range, setRange] = useState<'1h' | '12h'>('12h')
+  const [isPickerOpen, setPickerOpen] = useState(false)
 
   const mapRef = useRef<WeatherMapHandle>(null)
 
@@ -148,15 +153,16 @@ export default function RadarScreen() {
 
       {/* Top overlay: location + layer info */}
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
-        <View style={styles.topPill}>
+        <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
           <Ionicons name="location-sharp" size={14} color={activeConfig.color} />
           <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
+          <Ionicons name="chevron-down" size={14} color={TEXT_TERTIARY} />
           <View style={[styles.layerBadge, { borderColor: activeConfig.color }]}>
             <Text style={[styles.layerBadgeText, { color: activeConfig.color }]}>
               {activeConfig.description}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </SafeAreaView>
 
       <View style={styles.legendOverlay} pointerEvents="none">
@@ -259,6 +265,19 @@ export default function RadarScreen() {
           })}
         </View>
       </View>
+
+      <LocationPickerModal
+        visible={isPickerOpen}
+        currentCityName={cityName}
+        savedLocations={savedLocations}
+        recentLocationIds={recentLocationIds}
+        onClose={() => setPickerOpen(false)}
+        onUseDeviceLocation={useDeviceLocation}
+        onToggleFavorite={toggleFavorite}
+        onSelectLocation={(location) => {
+          selectManualLocation(location)
+        }}
+      />
     </View>
   )
 }
