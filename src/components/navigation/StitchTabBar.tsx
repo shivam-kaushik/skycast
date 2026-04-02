@@ -5,7 +5,7 @@ import { BlurView } from 'expo-blur'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import type { ComponentProps } from 'react'
-import { BG, ON_SURFACE, ACCENT_SOFT, TEXT_SECONDARY } from '@/src/theme/colors'
+import { BG, ON_SURFACE, ACCENT_SOFT } from '@/src/theme/colors'
 
 type IoniconName = ComponentProps<typeof Ionicons>['name']
 
@@ -70,7 +70,7 @@ export default function StitchTabBar({ state, descriptors, navigation }: BottomT
                 <Ionicons
                   name={name}
                   size={22}
-                  color={isFocused ? BG : TEXT_SECONDARY}
+                  color={isFocused ? BG : 'rgba(222, 225, 247, 0.88)'}
                   style={isFocused ? styles.iconActive : styles.iconIdle}
                 />
               </Pressable>

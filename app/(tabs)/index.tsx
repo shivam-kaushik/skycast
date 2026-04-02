@@ -1,14 +1,5 @@
 import React, { useState } from 'react'
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  StatusBar,
-  TouchableOpacity,
-  ImageBackground,
-} from 'react-native'
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, StatusBar, TouchableOpacity } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -17,6 +8,7 @@ import { usePrefsStore } from '@/src/store/prefsStore'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useLocation } from '@/src/hooks/useLocation'
 import DailyBriefCard from '@/src/components/home/DailyBriefCard'
+import WeatherAmbientBackground from '@/src/components/home/WeatherAmbientBackground'
 import HourlyStrip from '@/src/components/home/HourlyStrip'
 import ForecastList from '@/src/components/home/ForecastList'
 import MetricTilesGrid from '@/src/components/home/MetricTilesGrid'
@@ -37,9 +29,9 @@ import {
   SECONDARY,
 } from '@/src/theme/colors'
 import { FONT_BOLD, FONT_EXTRABOLD, FONT_MEDIUM } from '@/src/theme/typography'
-
-const HOME_BG =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuAsK_2xMI6P_20fBXoIj-WQ798haP2JyNR_4RIrXAwht72WYlos79L5JkKCNWK5QFvfr6cL8HCTw4jbtyhF-4lz_1aP6v-pjIgGa4xxhLUa1ygpLCQvcC5wCUKVBasuWXo2EP0vb4lIPKxyhhGCT8WkyEHn4Hg-2RKl267JYnuzcFhiLqUIk-h1cecvUDIDhfvy5hwGTMSVJFb74mnfKIRDXcL732aektYDjKyaBhFar3CMqfplNEOTH9-yUShOelZmBlBHtLgb7Ho'
+import { getAmbientVisualKind, isDaytimeFromSun } from '@/src/utils/ambientWeatherKind'
+import { homeScrimGradient } from '@/src/utils/homeAmbientOverlay'
+import { maxPrecipitationProbabilityNextHours } from '@/src/utils/hourlyPrecipMax'
 
 function tempNumber(value: number, unit: 'C' | 'F'): string {
   if (unit === 'F') return String(Math.round(value * (9 / 5) + 32))
@@ -110,19 +102,28 @@ export default function HomeScreen() {
   const { current, hourly, daily } = weather
   const { label: conditionLabel } = getWeatherCodeInfo(current.weatherCode)
   const num = tempNumber(current.temperature, unit)
+  const sunrise = daily.sunrise[0] ?? ''
+  const sunset = daily.sunset[0] ?? ''
+  const isDay = isDaytimeFromSun(sunrise, sunset)
+  const ambientKind = getAmbientVisualKind(current.weatherCode, isDay)
+  const scrim = homeScrimGradient(ambientKind)
+  /** Next ~12h window: ambient rain should track “soon” conditions, not tomorrow night’s forecast. */
+  const hourlyPrecipMax12h = maxPrecipitationProbabilityNextHours(hourly, 12)
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
-      <ImageBackground
-        source={{ uri: HOME_BG }}
-        style={StyleSheet.absoluteFillObject}
-        resizeMode="cover"
+      <WeatherAmbientBackground
+        weatherCode={current.weatherCode}
+        isDay={isDay}
+        precipitationProbability={current.precipitationProbability}
+        hourlyPrecipitationMax={hourlyPrecipMax12h}
       />
       <LinearGradient
-        colors={['rgba(14, 19, 34, 0.05)', 'rgba(14, 19, 34, 0.75)', BG]}
-        locations={[0, 0.45, 1]}
+        colors={scrim.colors}
+        locations={scrim.locations}
         style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
       />
 
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -143,7 +144,11 @@ export default function HomeScreen() {
             >
               <Text style={styles.headerPillTemp}>{formatTemp(current.temperature, unit)}</Text>
               <View style={styles.headerDivider} />
-              <Ionicons name="moon-outline" size={18} color={ACCENT_SOFT} />
+              <Ionicons
+                name={isDay ? 'sunny-outline' : 'moon-outline'}
+                size={18}
+                color={ACCENT_SOFT}
+              />
             </TouchableOpacity>
           </View>
 
