@@ -182,7 +182,7 @@ export default function HomeScreen() {
             <SectionLabel text="Hourly Forecast" />
             <Text style={styles.sectionLink}>Live</Text>
           </View>
-          <HourlyStrip hourly={hourly} unit={unit} />
+          <HourlyStrip hourly={hourly} daily={daily} unit={unit} />
 
           <View style={styles.spacer} />
 

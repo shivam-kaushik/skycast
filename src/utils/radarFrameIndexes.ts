@@ -22,9 +22,62 @@ export type RadarTimelineRangeHours = 1 | 12
 
 const HOUR_MS = 60 * 60 * 1000
 
+/** Lookback so “now” sits inside the window with typical 3-hourly model steps. */
+const LOOKBACK_1H_MS = 45 * 60 * 1000
+const LOOKBACK_12H_MS = 60 * 60 * 1000
+
 /**
- * Indices into `valid_times` (API order) sorted chronologically, keeping only instants
- * within `hours` before the latest valid time in the dataset.
+ * Indices into `valid_times` sorted by time: **current time through the next `hours`**
+ * (with a short lookback so the latest analysis step near “now” is included).
+ * This matches “1h / 12h forecast” UX instead of “last N hours before model end”.
+ */
+export function filterApiIndicesForwardFromNow(
+  validTimes: string[],
+  hours: RadarTimelineRangeHours,
+  nowMs: number,
+): number[] {
+  const pairs: { i: number; t: number }[] = []
+  for (let i = 0; i < validTimes.length; i++) {
+    const d = parseTimelineInstant(validTimes[i] ?? '')
+    if (d) pairs.push({ i, t: d.getTime() })
+  }
+  if (pairs.length === 0) return []
+
+  const lookback = hours <= 1 ? LOOKBACK_1H_MS : LOOKBACK_12H_MS
+  const forwardEnd = nowMs + hours * HOUR_MS
+  const winStart = nowMs - lookback
+
+  let inWindow = pairs.filter((p) => p.t >= winStart && p.t <= forwardEnd)
+  if (inWindow.length === 0) {
+    inWindow = nearestPairsAroundNow(pairs, nowMs, hours)
+  }
+  return [...inWindow].sort((a, b) => a.t - b.t).map((p) => p.i)
+}
+
+function nearestPairsAroundNow(
+  pairs: { i: number; t: number }[],
+  nowMs: number,
+  hours: RadarTimelineRangeHours,
+): { i: number; t: number }[] {
+  const chrono = [...pairs].sort((a, b) => a.t - b.t)
+  let bestK = 0
+  let bestDist = Infinity
+  for (let k = 0; k < chrono.length; k++) {
+    const d = Math.abs(chrono[k].t - nowMs)
+    if (d < bestDist) {
+      bestDist = d
+      bestK = k
+    }
+  }
+  const span = Math.max(hours * 4, 6)
+  const start = Math.max(0, bestK - span)
+  const end = Math.min(chrono.length, bestK + span + 1)
+  return chrono.slice(start, end)
+}
+
+/**
+ * @deprecated Prefer {@link filterApiIndicesForwardFromNow}. Kept for tests / fallback.
+ * Indices within the last `hours` before the dataset’s latest time.
  */
 export function filterApiIndicesWithinHoursBeforeLatest(
   validTimes: string[],
@@ -62,12 +115,36 @@ export function subsampleChronologicalApiIndices(chronologicalApiIndices: number
   return out
 }
 
-/** Subsampled API `valid_times` indices for the map, honoring 1h vs 12h window. */
+/** Subsampled API `valid_times` indices: next 1h or 12h from **now** (with lookback). */
 export function buildDisplayFrameApiIndices(
   validTimes: string[],
   hours: RadarTimelineRangeHours,
   maxFrames: number,
+  nowMs: number = Date.now(),
 ): number[] {
-  const chronological = filterApiIndicesWithinHoursBeforeLatest(validTimes, hours)
+  let chronological = filterApiIndicesForwardFromNow(validTimes, hours, nowMs)
+  if (chronological.length === 0) {
+    chronological = filterApiIndicesWithinHoursBeforeLatest(validTimes, hours)
+  }
   return subsampleChronologicalApiIndices(chronological, maxFrames)
+}
+
+/** Pick animation frame index whose label time is closest to `nowMs` (for map + scrubber sync). */
+export function indexOfFrameNearestToNow(
+  frameTimeLabels: readonly string[],
+  nowMs: number = Date.now(),
+): number {
+  if (frameTimeLabels.length === 0) return 0
+  let best = 0
+  let bestDist = Infinity
+  for (let i = 0; i < frameTimeLabels.length; i++) {
+    const d = parseTimelineInstant(frameTimeLabels[i] ?? '')
+    if (!d) continue
+    const dist = Math.abs(d.getTime() - nowMs)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = i
+    }
+  }
+  return best
 }

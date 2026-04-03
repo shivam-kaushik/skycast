@@ -58,10 +58,15 @@ function LightMote({ index, strength }: { index: number; strength: number }) {
   return <Animated.View style={style} pointerEvents="none" />
 }
 
+/** Must match `GRADIENTS.partlyCloudyDay[0]` / `clearDay[0]` in WeatherAmbientBackground. */
+const SKY_CLEAR_OUTER = '#1a5fb4'
+const SKY_PARTLY_OUTER = '#2563a8'
+
 function SoftSunBloom({ variant }: { variant: ClearDayAmbientVariant }) {
-  const { width: W } = useWindowDimensions()
+  const { width: W, height: H } = useWindowDimensions()
   const pulse = useSharedValue(0)
   const strength = variant === 'clear' ? 1 : 0.62
+  const skyOuter = variant === 'clear' ? SKY_CLEAR_OUTER : SKY_PARTLY_OUTER
 
   useEffect(() => {
     pulse.value = withRepeat(
@@ -75,7 +80,7 @@ function SoftSunBloom({ variant }: { variant: ClearDayAmbientVariant }) {
     opacity: interpolate(pulse.value, [0, 1], [0.82 * strength, 1 * strength]),
   }))
 
-  const h = Math.min(380, Math.max(260, W * 0.92))
+  /** Full viewport height avoids a hard horizontal seam where the SVG rect ended (~mid-screen). */
   const sunCx = W * 0.78
   const sunCy = 68
   const bloomR = W * 0.52
@@ -89,12 +94,12 @@ function SoftSunBloom({ variant }: { variant: ClearDayAmbientVariant }) {
       style={[styles.svgWrap, wrapStyle]}
       pointerEvents="none"
     >
-      <Svg width={W} height={h} style={styles.svg}>
+      <Svg width={W} height={H} style={styles.svg}>
         <Defs>
           <RadialGradient id={gidBloom} cx={sunCx} cy={sunCy} r={bloomR} gradientUnits="userSpaceOnUse">
             <Stop offset="0%" stopColor="#fff9ec" stopOpacity={0.38 * strength} />
             <Stop offset="35%" stopColor="#a8d4ff" stopOpacity={0.14 * strength} />
-            <Stop offset="100%" stopColor="#1a5fb4" stopOpacity={0} />
+            <Stop offset="100%" stopColor={skyOuter} stopOpacity={0} />
           </RadialGradient>
           <RadialGradient id={gidCore} cx={sunCx} cy={sunCy} r={coreR} gradientUnits="userSpaceOnUse">
             <Stop offset="0%" stopColor="#fff2c8" stopOpacity={0.55 * strength} />

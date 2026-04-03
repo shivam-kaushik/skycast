@@ -22,3 +22,21 @@ export function formatTimelineClock(d: Date | null): string {
   const mm = m < 10 ? `0${m}` : String(m)
   return `${h12}:${mm} ${am}`
 }
+
+/** First entry in `times` that parses to a valid instant (for scrubber end labels). */
+export function firstParsedTimelineDate(times: readonly string[]): Date | null {
+  for (const s of times) {
+    const d = parseTimelineInstant(s)
+    if (d) return d
+  }
+  return null
+}
+
+/** Last entry in `times` that parses to a valid instant. */
+export function lastParsedTimelineDate(times: readonly string[]): Date | null {
+  for (let i = times.length - 1; i >= 0; i--) {
+    const d = parseTimelineInstant(times[i] ?? '')
+    if (d) return d
+  }
+  return null
+}

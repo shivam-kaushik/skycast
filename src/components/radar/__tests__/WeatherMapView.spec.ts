@@ -38,6 +38,7 @@ describe('buildMapHTML', () => {
         windVectorSourceUrl,
         windVectorValidTimesLength: 12,
         frameIndices: [0, 4, 8, 11],
+        initialFrameIndex: 0,
       },
       ['2025-01-01T12:00:00Z', '2025-01-01T15:00:00Z'],
     )

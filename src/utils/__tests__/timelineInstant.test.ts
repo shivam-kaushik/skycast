@@ -1,4 +1,9 @@
-import { formatTimelineClock, parseTimelineInstant } from '@/src/utils/timelineInstant'
+import {
+  firstParsedTimelineDate,
+  formatTimelineClock,
+  lastParsedTimelineDate,
+  parseTimelineInstant,
+} from '@/src/utils/timelineInstant'
 
 describe('parseTimelineInstant', () => {
   it('parses ISO strings', () => {
@@ -34,5 +39,13 @@ describe('formatTimelineClock', () => {
 
   it('returns em dash for null', () => {
     expect(formatTimelineClock(null)).toBe('—')
+  })
+})
+
+describe('firstParsedTimelineDate / lastParsedTimelineDate', () => {
+  it('skips empty strings and uses first/last valid instants', () => {
+    const times = ['', '2026-04-01T14:00:00.000Z', '', '2026-04-01T18:00:00.000Z']
+    expect(firstParsedTimelineDate(times)?.toISOString()).toBe('2026-04-01T14:00:00.000Z')
+    expect(lastParsedTimelineDate(times)?.toISOString()).toBe('2026-04-01T18:00:00.000Z')
   })
 })

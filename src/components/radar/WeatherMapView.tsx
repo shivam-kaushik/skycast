@@ -8,6 +8,7 @@ import { type MapLayer } from '@/src/components/radar/mapLayerConfig'
 import {
   buildDisplayFrameApiIndices,
   buildRadarDisplayFrameIndexes,
+  indexOfFrameNearestToNow,
 } from '@/src/utils/radarFrameIndexes'
 export type { MapLayer } from '@/src/components/radar/mapLayerConfig'
 
@@ -53,6 +54,8 @@ export function buildMapHTML(
     windVectorValidTimesLength?: number
     /** Open-Meteo `valid_times_*` indices (chronological order), already subsampled. */
     frameIndices: number[]
+    /** Start animation on the frame whose valid time is nearest to load time (usually “now”). */
+    initialFrameIndex: number
   },
   /** ISO time for each animation frame (same length as subsampled frames in the map) */
   frameTimeLabels: string[],
@@ -115,6 +118,7 @@ export function buildMapHTML(
   var OM_MAX_NATIVE_ZOOM = 12;
   var FRAME_INDICES = ${JSON.stringify(params.frameIndices)};
   var FRAME_TIME_LABELS = ${JSON.stringify(frameTimeLabels)};
+  var INITIAL_FRAME_INDEX = ${params.initialFrameIndex};
 
   var map = L.map('map', {
     center: [LAT, LON],
@@ -345,7 +349,10 @@ export function buildMapHTML(
       }
     }
 
-    showFrame(0);
+    var startIdx = typeof INITIAL_FRAME_INDEX === 'number' ? Math.floor(INITIAL_FRAME_INDEX) : 0;
+    if (startIdx < 0 || startIdx >= radarFrames.length) startIdx = 0;
+    currentFrame = startIdx;
+    showFrame(currentFrame);
     startAnimation();
 
     try {
@@ -463,7 +470,12 @@ export function buildMapHTML(
 </html>`
 }
 
-export function buildPrecipitationHTML(lat: number, lon: number): string {
+export function buildPrecipitationHTML(
+  lat: number,
+  lon: number,
+  timelineRange: '1h' | '12h',
+): string {
+  const rangeHours = timelineRange === '1h' ? 1 : 12
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -590,6 +602,37 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
   window.addEventListener('message', handleMessage);
   document.addEventListener('message', handleMessage);
 
+  var RANGE_HOURS = ${rangeHours};
+
+  function subsampleEvenly(arr, maxCount) {
+    if (!arr || arr.length === 0) return [];
+    if (arr.length === 1) return [arr[0]];
+    if (arr.length <= maxCount) return arr.slice();
+    var out = [];
+    var n = arr.length;
+    var step = (n - 1) / (maxCount - 1);
+    for (var j = 0; j < maxCount; j++) {
+      var idx = Math.round(j * step);
+      if (idx >= n) idx = n - 1;
+      out.push(arr[idx]);
+    }
+    return out;
+  }
+
+  function frameToIso(frame, frameIndex, frameCount) {
+    var ut = frame.time;
+    if (typeof ut === 'number') {
+      var ms = ut > 1e12 ? ut : ut * 1000;
+      return new Date(ms).toISOString();
+    }
+    if (typeof ut === 'string' && ut.length > 0) {
+      var d = new Date(ut);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    var stepMs = 10 * 60 * 1000;
+    return new Date(Date.now() - (frameCount - 1 - frameIndex) * stepMs).toISOString();
+  }
+
   fetch('https://api.rainviewer.com/public/weather-maps.json')
     .then(function(res) { return res.json(); })
     .then(function(data) {
@@ -597,9 +640,25 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
       var past = data.radar && data.radar.past ? data.radar.past : [];
       var nowcast = data.radar && data.radar.nowcast ? data.radar.nowcast : [];
 
-      var pastFrames = past.slice(-6);
-      var nowcastFrames = nowcast.slice(0, 4);
-      var frames = pastFrames.concat(nowcastFrames);
+      var frames;
+      if (RANGE_HOURS <= 1) {
+        var pastShort = past.slice(-6);
+        var nowcastShort = nowcast.slice(0, 4);
+        frames = pastShort.concat(nowcastShort);
+      } else {
+        var take = Math.min(past.length, 72);
+        var longPast = take > 0 ? past.slice(-take) : [];
+        var pastSub = longPast.length > 0 ? subsampleEvenly(longPast, 8) : past.slice(-6);
+        var nowcastLong = nowcast.slice(0, 4);
+        frames = pastSub.concat(nowcastLong);
+      }
+
+      if (frames.length === 0) {
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: 'No radar frames' }));
+        } catch (_) {}
+        return;
+      }
 
       for (var i = 0; i < frames.length; i++) {
         var frame = frames[i];
@@ -612,17 +671,26 @@ export function buildPrecipitationHTML(lat: number, lon: number): string {
         });
         tileLayer.addTo(map);
         tileLayers.push(tileLayer);
-        var ut = frame.time;
-        if (typeof ut === 'number') {
-          var ms = ut > 1e12 ? ut : ut * 1000;
-          FRAME_TIME_LABELS.push(new Date(ms).toISOString());
-        } else {
-          FRAME_TIME_LABELS.push('');
-        }
+        FRAME_TIME_LABELS.push(frameToIso(frame, i, frames.length));
       }
 
       if (tileLayers.length > 0) {
-        showFrame(0);
+        var nowMsRadar = Date.now();
+        var bestR = 0;
+        var bestRd = Infinity;
+        for (var ri = 0; ri < FRAME_TIME_LABELS.length; ri++) {
+          var isoR = FRAME_TIME_LABELS[ri];
+          if (!isoR) continue;
+          var tr = new Date(isoR).getTime();
+          if (isNaN(tr)) continue;
+          var dr = Math.abs(tr - nowMsRadar);
+          if (dr < bestRd) {
+            bestRd = dr;
+            bestR = ri;
+          }
+        }
+        currentFrame = bestR;
+        showFrame(currentFrame);
         startAnimation();
         try {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS }));
@@ -672,13 +740,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
   useEffect(() => {
     setMapError(false)
     setMapLoading(true)
-  }, [lat, lon, layer])
-
-  useEffect(() => {
-    if (layer === 'precipitation') return
-    setMapError(false)
-    setMapLoading(true)
-  }, [layer, timelineRange])
+  }, [lat, lon, layer, timelineRange])
 
   useImperativeHandle(ref, () => ({
     play() {
@@ -728,6 +790,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     )
   }
 
+  const nowMs = Date.now()
   const rangeHours = timelineRange === '1h' ? 1 : 12
   const displayIndexes = !isPrecip
     ? (() => {
@@ -735,6 +798,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
           tileMeta!.validTimes,
           rangeHours,
           MAX_MAP_FRAMES,
+          nowMs,
         )
         if (fromRange.length > 0) return fromRange
         return buildRadarDisplayFrameIndexes(tileMeta!.tileValidTimesLength, MAX_MAP_FRAMES)
@@ -743,10 +807,15 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
   const frameTimeLabels = !isPrecip
     ? displayIndexes.map((i) => tileMeta!.validTimes[i] ?? '')
     : []
+  const initialFrameIndex = !isPrecip ? indexOfFrameNearestToNow(frameTimeLabels, nowMs) : 0
 
   const html = isPrecip
-    ? buildPrecipitationHTML(lat, lon)
-    : buildMapHTML(lat, lon, layer, overlay, { ...tileMeta!, frameIndices: displayIndexes }, frameTimeLabels)
+    ? buildPrecipitationHTML(lat, lon, timelineRange)
+    : buildMapHTML(lat, lon, layer, overlay, {
+        ...tileMeta!,
+        frameIndices: displayIndexes,
+        initialFrameIndex,
+      }, frameTimeLabels)
 
   // baseUrl must be a real HTTPS origin so Android WebView allows CDN requests
   const baseUrl = Platform.OS === 'android'
@@ -768,11 +837,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
         </View>
       )}
       <WebView
-        key={
-          isPrecip
-            ? `${layer}-${lat}-${lon}`
-            : `${layer}-${lat}-${lon}-${timelineRange}`
-        }
+        key={`${layer}-${lat}-${lon}-${timelineRange}`}
         ref={webViewRef}
         source={{ html, baseUrl }}
         style={styles.webview}

@@ -1,8 +1,29 @@
 import {
   buildDisplayFrameApiIndices,
+  filterApiIndicesForwardFromNow,
   filterApiIndicesWithinHoursBeforeLatest,
+  indexOfFrameNearestToNow,
   subsampleChronologicalApiIndices,
 } from '@/src/utils/radarFrameIndexes'
+
+describe('filterApiIndicesForwardFromNow', () => {
+  it('selects instants from a short lookback through now + N hours', () => {
+    const now = Date.parse('2026-04-01T15:00:00.000Z')
+    const validTimes = [
+      new Date(now - 3 * 3600000).toISOString(),
+      new Date(now - 30 * 60000).toISOString(),
+      new Date(now + 2 * 3600000).toISOString(),
+      new Date(now + 8 * 3600000).toISOString(),
+      new Date(now + 20 * 3600000).toISOString(),
+    ]
+    const idx = filterApiIndicesForwardFromNow(validTimes, 12, now)
+    expect(idx).toContain(1)
+    expect(idx).toContain(2)
+    expect(idx).toContain(3)
+    expect(idx).not.toContain(0)
+    expect(idx).not.toContain(4)
+  })
+})
 
 describe('filterApiIndicesWithinHoursBeforeLatest', () => {
   it('keeps only instants within 1h before the latest time', () => {
@@ -51,10 +72,22 @@ describe('buildDisplayFrameApiIndices', () => {
     const validTimes = Array.from({ length: 24 }, (_, i) =>
       new Date(base - (23 - i) * 3600000).toISOString(),
     )
-    const one = buildDisplayFrameApiIndices(validTimes, 1, 4)
+    const one = buildDisplayFrameApiIndices(validTimes, 1, 4, base)
     expect(one.length).toBeLessThanOrEqual(4)
-    const twelve = buildDisplayFrameApiIndices(validTimes, 12, 8)
+    const twelve = buildDisplayFrameApiIndices(validTimes, 12, 8, base)
     expect(twelve.length).toBeLessThanOrEqual(8)
     expect(new Set(twelve).size).toBe(twelve.length)
+  })
+})
+
+describe('indexOfFrameNearestToNow', () => {
+  it('returns index of label closest to now', () => {
+    const now = Date.parse('2026-04-01T14:05:00.000Z')
+    const labels = [
+      '2026-04-01T12:00:00.000Z',
+      '2026-04-01T14:00:00.000Z',
+      '2026-04-01T18:00:00.000Z',
+    ]
+    expect(indexOfFrameNearestToNow(labels, now)).toBe(1)
   })
 })

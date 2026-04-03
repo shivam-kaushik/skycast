@@ -151,8 +151,15 @@ export default function RadarScreen() {
     setIsPlaying(true)
   }, [activeLayer, lat, lon, range])
 
-  const currentOffsetHours =
-    totalFrames > 1 ? Math.round((frameIndex / (totalFrames - 1)) * (range === '1h' ? 1 : 12)) : 0
+  /** Hours ahead of real “now” for the selected frame (+/-), not slider position. */
+  const offsetHoursFromNow = (() => {
+    if (!currentTimeIso) return 0
+    const d = parseTimelineInstant(currentTimeIso)
+    if (!d) return 0
+    const dh = (d.getTime() - Date.now()) / (60 * 60 * 1000)
+    if (Math.abs(dh) < 0.2) return 0
+    return Math.round(dh)
+  })()
 
   if (isLoading || !weather) {
     return (
@@ -278,7 +285,11 @@ export default function RadarScreen() {
               </View>
               <View style={styles.offsetBadge}>
                 <Text style={styles.offsetText}>
-                  {currentOffsetHours === 0 ? 'Now' : `+${currentOffsetHours}h`}
+                  {offsetHoursFromNow === 0
+                    ? 'Now'
+                    : offsetHoursFromNow > 0
+                      ? `+${offsetHoursFromNow}h`
+                      : `${offsetHoursFromNow}h`}
                 </Text>
               </View>
             </View>

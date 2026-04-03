@@ -159,12 +159,14 @@ function StratusBand({
   dur,
   seed,
   strength,
+  palette,
 }: {
   top: `${number}%`
   heightPct: `${number}%`
   dur: number
   seed: number
   strength: number
+  palette: 'overcast' | 'partly'
 }) {
   const y = useSharedValue(0)
   useEffect(() => {
@@ -184,11 +186,26 @@ function StratusBand({
   }))
   const a = 0.42 * strength
   const b = 0.2 * strength
+  /**
+   * Partly-cloudy: tint with sky blues (see GRADIENTS.partlyCloudyDay) so fades to transparent
+   * do not leave a charcoal edge on the blue base. Overcast keeps cooler neutral grays.
+   */
+  const colors: readonly [string, string, string, string] | readonly [string, string, string] =
+    palette === 'partly'
+      ? ([
+          `rgba(42, 96, 152, ${0.34 * strength})`,
+          `rgba(58, 112, 168, ${0.2 * strength})`,
+          `rgba(82, 132, 188, ${0.06 * strength})`,
+          'rgba(255, 255, 255, 0)',
+        ] as const)
+      : ([`rgba(55, 65, 82, ${a})`, `rgba(75, 86, 102, ${b})`, 'rgba(255, 255, 255, 0)'] as const)
+  const locations =
+    palette === 'partly' ? ([0, 0.38, 0.72, 1] as const) : ([0, 0.5, 1] as const)
   return (
     <Animated.View style={style} pointerEvents="none">
       <LinearGradient
-        colors={[`rgba(55, 65, 82, ${a})`, `rgba(75, 86, 102, ${b})`, 'transparent']}
-        locations={[0, 0.5, 1]}
+        colors={colors}
+        locations={locations}
         style={StyleSheet.absoluteFill}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -199,11 +216,12 @@ function StratusBand({
 
 function StratusBands({ variant }: { variant: 'overcast' | 'partly' }) {
   const s = variant === 'partly' ? 0.55 : 1
+  const palette = variant
   return (
     <>
-      <StratusBand top="-8%" heightPct="44%" dur={42000} seed={0} strength={s} />
-      <StratusBand top="18%" heightPct="36%" dur={52000} seed={1} strength={s * 0.88} />
-      <StratusBand top="36%" heightPct="32%" dur={48000} seed={2} strength={s * 0.72} />
+      <StratusBand top="-8%" heightPct="44%" dur={42000} seed={0} strength={s} palette={palette} />
+      <StratusBand top="18%" heightPct="36%" dur={52000} seed={1} strength={s * 0.88} palette={palette} />
+      <StratusBand top="36%" heightPct="32%" dur={48000} seed={2} strength={s * 0.72} palette={palette} />
     </>
   )
 }

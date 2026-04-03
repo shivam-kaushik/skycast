@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, StyleSheet, PanResponder, type LayoutChangeEvent } from 'react-native'
-import { formatTimelineClock, parseTimelineInstant } from '@/src/utils/timelineInstant'
+import {
+  firstParsedTimelineDate,
+  formatTimelineClock,
+  lastParsedTimelineDate,
+} from '@/src/utils/timelineInstant'
 import { TEXT_TERTIARY, ACCENT_SOFT, GLASS_BG, GHOST_BORDER } from '@/src/theme/colors'
 import { FONT_MEDIUM } from '@/src/theme/typography'
 
@@ -45,12 +49,12 @@ export default function RadarTimeScrubber({
   }, [safeIndex])
 
   const firstClock = useMemo(
-    () => formatTimelineClock(parseTimelineInstant(times[0] ?? '')),
+    () => formatTimelineClock(firstParsedTimelineDate(times)),
     [times],
   )
   const lastClock = useMemo(
-    () => formatTimelineClock(parseTimelineInstant(times[count - 1] ?? '')),
-    [times, count],
+    () => formatTimelineClock(lastParsedTimelineDate(times)),
+    [times],
   )
 
   const commitX = useCallback(
