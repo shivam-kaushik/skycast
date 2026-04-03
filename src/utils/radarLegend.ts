@@ -12,7 +12,7 @@ export interface RadarLegendConfig {
 
 const LEGEND_CONFIG: Record<MapLayer, RadarLegendConfig> = {
   precipitation: {
-    title: 'Precipitation',
+    title: 'Precipitation (forecast)',
     stops: [
       { label: 'Extreme', color: '#F8E71C' },
       { label: 'Heavy', color: '#C870F8' },
@@ -21,7 +21,7 @@ const LEGEND_CONFIG: Record<MapLayer, RadarLegendConfig> = {
     ],
   },
   temperature: {
-    title: 'Temperature',
+    title: 'Temperature (forecast)',
     stops: [
       { label: '>38C', color: '#FF3B30' },
       { label: '31-38C', color: '#FF6B6B' },
@@ -32,7 +32,7 @@ const LEGEND_CONFIG: Record<MapLayer, RadarLegendConfig> = {
     ],
   },
   wind: {
-    title: 'Wind',
+    title: 'Wind (forecast)',
     stops: [
       { label: 'Severe', color: '#FF6B6B' },
       { label: 'Strong', color: '#FFD166' },
@@ -41,7 +41,7 @@ const LEGEND_CONFIG: Record<MapLayer, RadarLegendConfig> = {
     ],
   },
   air: {
-    title: 'Air Quality',
+    title: 'Air quality (forecast)',
     stops: [
       { label: 'Very Unhealthy', color: '#C0392B' },
       { label: 'Unhealthy', color: '#FF6B6B' },

@@ -3,6 +3,7 @@ import {
   filterApiIndicesForwardFromNow,
   filterApiIndicesWithinHoursBeforeLatest,
   indexOfFrameNearestToNow,
+  singleApiIndexNearestToNow,
   subsampleChronologicalApiIndices,
 } from '@/src/utils/radarFrameIndexes'
 
@@ -77,6 +78,19 @@ describe('buildDisplayFrameApiIndices', () => {
     const twelve = buildDisplayFrameApiIndices(validTimes, 12, 8, base)
     expect(twelve.length).toBeLessThanOrEqual(8)
     expect(new Set(twelve).size).toBe(twelve.length)
+  })
+})
+
+describe('singleApiIndexNearestToNow', () => {
+  it('returns the API index whose time is closest to now within the window', () => {
+    const now = Date.parse('2026-04-01T15:00:00.000Z')
+    const validTimes = [
+      new Date(now - 2 * 3600000).toISOString(),
+      new Date(now + 1 * 3600000).toISOString(),
+      new Date(now + 6 * 3600000).toISOString(),
+    ]
+    const idx = singleApiIndexNearestToNow(validTimes, 12, now)
+    expect(idx).toBe(1)
   })
 })
 

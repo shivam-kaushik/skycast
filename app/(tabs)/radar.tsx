@@ -58,28 +58,28 @@ const LAYERS: LayerConfig[] = [
     label: 'Radar',
     icon: 'rainy-outline',
     color: SECONDARY,
-    description: 'Live animated radar',
+    description: 'Forecast precipitation (next hours)',
   },
   {
     key: 'temperature',
     label: 'Temp',
     icon: 'thermometer-outline',
     color: ACCENT_SOFT,
-    description: 'Current temperature',
+    description: 'Forecast temperature (next hours)',
   },
   {
     key: 'wind',
     label: 'Wind',
     icon: 'navigate-outline',
     color: '#06D6A0',
-    description: 'Wind speed & direction',
+    description: 'Forecast wind & gusts (next hours)',
   },
   {
     key: 'air',
     label: 'Air',
     icon: 'leaf-outline',
     color: '#FFD166',
-    description: 'Air quality index',
+    description: 'Forecast air quality (next hours)',
   },
 ]
 
@@ -249,7 +249,9 @@ export default function RadarScreen() {
           })}
         </View>
 
-        {totalFrames > 0 && (
+        {totalFrames > 0 &&
+          activeLayer !== 'temperature' &&
+          activeLayer !== 'air' && (
           <View style={styles.timelineCard} pointerEvents="auto">
             <View style={styles.timelineTopRow}>
               <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>

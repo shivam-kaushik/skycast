@@ -129,6 +129,34 @@ export function buildDisplayFrameApiIndices(
   return subsampleChronologicalApiIndices(chronological, maxFrames)
 }
 
+/**
+ * Single `valid_times` API index closest to `nowMs` within the forward window
+ * (for layers that show one static map frame, no timeline).
+ */
+export function singleApiIndexNearestToNow(
+  validTimes: string[],
+  hours: RadarTimelineRangeHours,
+  nowMs: number,
+): number | null {
+  let chronological = filterApiIndicesForwardFromNow(validTimes, hours, nowMs)
+  if (chronological.length === 0) {
+    chronological = filterApiIndicesWithinHoursBeforeLatest(validTimes, hours)
+  }
+  if (chronological.length === 0) return null
+  let bestIdx = chronological[0]!
+  let bestDist = Infinity
+  for (const apiIdx of chronological) {
+    const d = parseTimelineInstant(validTimes[apiIdx] ?? '')
+    if (!d) continue
+    const dist = Math.abs(d.getTime() - nowMs)
+    if (dist < bestDist) {
+      bestDist = dist
+      bestIdx = apiIdx
+    }
+  }
+  return bestIdx
+}
+
 /** Pick animation frame index whose label time is closest to `nowMs` (for map + scrubber sync). */
 export function indexOfFrameNearestToNow(
   frameTimeLabels: readonly string[],

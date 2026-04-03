@@ -9,7 +9,11 @@ import {
   buildDisplayFrameApiIndices,
   buildRadarDisplayFrameIndexes,
   indexOfFrameNearestToNow,
+  singleApiIndexNearestToNow,
 } from '@/src/utils/radarFrameIndexes'
+
+/** No timeline UI — one map frame nearest to now (see radar screen). */
+const STATIC_MAP_LAYERS: MapLayer[] = ['temperature', 'air']
 export type { MapLayer } from '@/src/components/radar/mapLayerConfig'
 
 export interface WeatherMapHandle {
@@ -378,7 +382,7 @@ export function buildMapHTML(
   }
 
   // ── ANIMATED WEATHER LAYERS ────────────────────────────────────
-  if (LAYER === 'temperature' || LAYER === 'wind' || LAYER === 'air') {
+  if (LAYER === 'temperature' || LAYER === 'wind' || LAYER === 'air' || LAYER === 'precipitation') {
     setupAnimatedOverlay();
   }
 
@@ -470,242 +474,7 @@ export function buildMapHTML(
 </html>`
 }
 
-export function buildPrecipitationHTML(
-  lat: number,
-  lon: number,
-  timelineRange: '1h' | '12h',
-): string {
-  const rangeHours = timelineRange === '1h' ? 1 : 12
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0A0F1E; overflow: hidden; }
-    #map { width: 100%; height: 100%; }
-    .leaflet-control-zoom { display: none !important; }
-    .leaflet-control-attribution { display: none !important; }
-    .leaflet-bar { display: none !important; }
-    .pulse-ring {
-      width: 20px; height: 20px;
-      border-radius: 50%;
-      background: rgba(74,158,255,0.4);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%   { transform: scale(1);   opacity: 0.8; }
-      50%  { transform: scale(2.2); opacity: 0;   }
-      100% { transform: scale(1);   opacity: 0.8; }
-    }
-  </style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-  var LAT = ${lat};
-  var LON = ${lon};
-
-  var map = L.map('map', {
-    center: [LAT, LON],
-    zoom: 8,
-    maxZoom: 19,
-    zoomControl: false,
-    attributionControl: false,
-    preferCanvas: true
-  });
-
-  map.createPane('basePane');
-  map.getPane('basePane').style.zIndex = 200;
-  map.createPane('labelPane');
-  map.getPane('labelPane').style.zIndex = 340;
-  map.createPane('dataPane');
-  map.getPane('dataPane').style.zIndex = 320;
-
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
-    pane: 'basePane'
-  }).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
-    opacity: 0.92,
-    pane: 'labelPane',
-  }).addTo(map);
-
-  var pulseIcon = L.divIcon({
-    className: '',
-    html: '<div style="position:relative;width:20px;height:20px;"><div class="pulse-ring" style="position:absolute;top:0;left:0;"></div><div style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#4A9EFF;border:2px solid #fff;"></div></div>',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-  });
-  L.marker([LAT, LON], { icon: pulseIcon }).addTo(map);
-
-  window.onerror = function(message, source, lineno, colno, error) {
-    try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'error',
-        msg: String(message || (error && error.message) || 'Unknown WebView error')
-      }));
-    } catch (_) {}
-    return false;
-  };
-
-  var tileLayers = [];
-  var FRAME_TIME_LABELS = [];
-  var currentFrame = 0;
-  var isPlaying = true;
-  var animTimer = null;
-
-  function showFrame(idx) {
-    for (var i = 0; i < tileLayers.length; i++) {
-      tileLayers[i].setOpacity(i === idx ? 0.85 : 0);
-    }
-    try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'frame',
-        current: idx,
-        total: tileLayers.length,
-        timeISO: FRAME_TIME_LABELS[idx] || null
-      }));
-    } catch(e) {}
-  }
-
-  function startAnimation() {
-    if (animTimer) clearInterval(animTimer);
-    animTimer = setInterval(function() {
-      if (!isPlaying || tileLayers.length === 0) return;
-      currentFrame = (currentFrame + 1) % tileLayers.length;
-      showFrame(currentFrame);
-    }, 650);
-  }
-
-  function handleMessage(e) {
-    try {
-      var msg = JSON.parse(e.data);
-      if (msg.type === 'play') { isPlaying = true; }
-      if (msg.type === 'pause') { isPlaying = false; }
-      if (msg.type === 'seek' && typeof msg.index === 'number') {
-        var si = Math.floor(msg.index);
-        if (si >= 0 && si < tileLayers.length) {
-          currentFrame = si;
-          showFrame(currentFrame);
-        }
-      }
-    } catch(_) {}
-  }
-
-  window.addEventListener('message', handleMessage);
-  document.addEventListener('message', handleMessage);
-
-  var RANGE_HOURS = ${rangeHours};
-
-  function subsampleEvenly(arr, maxCount) {
-    if (!arr || arr.length === 0) return [];
-    if (arr.length === 1) return [arr[0]];
-    if (arr.length <= maxCount) return arr.slice();
-    var out = [];
-    var n = arr.length;
-    var step = (n - 1) / (maxCount - 1);
-    for (var j = 0; j < maxCount; j++) {
-      var idx = Math.round(j * step);
-      if (idx >= n) idx = n - 1;
-      out.push(arr[idx]);
-    }
-    return out;
-  }
-
-  function frameToIso(frame, frameIndex, frameCount) {
-    var ut = frame.time;
-    if (typeof ut === 'number') {
-      var ms = ut > 1e12 ? ut : ut * 1000;
-      return new Date(ms).toISOString();
-    }
-    if (typeof ut === 'string' && ut.length > 0) {
-      var d = new Date(ut);
-      if (!isNaN(d.getTime())) return d.toISOString();
-    }
-    var stepMs = 10 * 60 * 1000;
-    return new Date(Date.now() - (frameCount - 1 - frameIndex) * stepMs).toISOString();
-  }
-
-  fetch('https://api.rainviewer.com/public/weather-maps.json')
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-      var host = data.host;
-      var past = data.radar && data.radar.past ? data.radar.past : [];
-      var nowcast = data.radar && data.radar.nowcast ? data.radar.nowcast : [];
-
-      var frames;
-      if (RANGE_HOURS <= 1) {
-        var pastShort = past.slice(-6);
-        var nowcastShort = nowcast.slice(0, 4);
-        frames = pastShort.concat(nowcastShort);
-      } else {
-        var take = Math.min(past.length, 72);
-        var longPast = take > 0 ? past.slice(-take) : [];
-        var pastSub = longPast.length > 0 ? subsampleEvenly(longPast, 8) : past.slice(-6);
-        var nowcastLong = nowcast.slice(0, 4);
-        frames = pastSub.concat(nowcastLong);
-      }
-
-      if (frames.length === 0) {
-        try {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: 'No radar frames' }));
-        } catch (_) {}
-        return;
-      }
-
-      for (var i = 0; i < frames.length; i++) {
-        var frame = frames[i];
-        var url = host + frame.path + '/512/{z}/{x}/{y}/6/1_1.png';
-        var tileLayer = L.tileLayer(url, {
-          tileSize: 512,
-          zoomOffset: -1,
-          opacity: i === 0 ? 0.85 : 0,
-          pane: 'dataPane'
-        });
-        tileLayer.addTo(map);
-        tileLayers.push(tileLayer);
-        FRAME_TIME_LABELS.push(frameToIso(frame, i, frames.length));
-      }
-
-      if (tileLayers.length > 0) {
-        var nowMsRadar = Date.now();
-        var bestR = 0;
-        var bestRd = Infinity;
-        for (var ri = 0; ri < FRAME_TIME_LABELS.length; ri++) {
-          var isoR = FRAME_TIME_LABELS[ri];
-          if (!isoR) continue;
-          var tr = new Date(isoR).getTime();
-          if (isNaN(tr)) continue;
-          var dr = Math.abs(tr - nowMsRadar);
-          if (dr < bestRd) {
-            bestRd = dr;
-            bestR = ri;
-          }
-        }
-        currentFrame = bestR;
-        showFrame(currentFrame);
-        startAnimation();
-        try {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS }));
-        } catch (e) {}
-      }
-    })
-    .catch(function(e) {
-      try {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(e) }));
-      } catch(_) {}
-    });
-</script>
-</body>
-</html>`
-}
+/** Precipitation uses the same Open-Meteo map tiles as other layers (see `buildMapHTML`). */
 
 const MAX_MAP_FRAMES = 8
 
@@ -729,13 +498,11 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
   const [mapError, setMapError] = useState(false)
   const [mapLoading, setMapLoading] = useState(true)
 
-  const isPrecip = layer === 'precipitation'
-
   const {
     data: tileMeta,
     isLoading: tileMetaLoading,
     isError: tileMetaError,
-  } = useOmeteoMapTileMetadata(layer, { enabled: !isPrecip })
+  } = useOmeteoMapTileMetadata(layer)
 
   useEffect(() => {
     setMapError(false)
@@ -768,7 +535,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     feelsLike: weather.current.apparentTemperature,
   }
 
-  if (!isPrecip && tileMetaLoading) {
+  if (tileMetaLoading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingOverlay}>
@@ -779,7 +546,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     )
   }
 
-  if (!isPrecip && (tileMetaError || !tileMeta)) {
+  if (tileMetaError || !tileMeta) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingOverlay}>
@@ -792,30 +559,42 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
 
   const nowMs = Date.now()
   const rangeHours = timelineRange === '1h' ? 1 : 12
-  const displayIndexes = !isPrecip
-    ? (() => {
-        const fromRange = buildDisplayFrameApiIndices(
-          tileMeta!.validTimes,
-          rangeHours,
-          MAX_MAP_FRAMES,
-          nowMs,
-        )
-        if (fromRange.length > 0) return fromRange
-        return buildRadarDisplayFrameIndexes(tileMeta!.tileValidTimesLength, MAX_MAP_FRAMES)
-      })()
-    : []
-  const frameTimeLabels = !isPrecip
-    ? displayIndexes.map((i) => tileMeta!.validTimes[i] ?? '')
-    : []
-  const initialFrameIndex = !isPrecip ? indexOfFrameNearestToNow(frameTimeLabels, nowMs) : 0
+  const useStaticSingleFrame = STATIC_MAP_LAYERS.includes(layer)
 
-  const html = isPrecip
-    ? buildPrecipitationHTML(lat, lon, timelineRange)
-    : buildMapHTML(lat, lon, layer, overlay, {
-        ...tileMeta!,
-        frameIndices: displayIndexes,
-        initialFrameIndex,
-      }, frameTimeLabels)
+  const displayIndexes = (() => {
+    if (useStaticSingleFrame) {
+      const one = singleApiIndexNearestToNow(tileMeta.validTimes, rangeHours, nowMs)
+      if (one !== null) return [one]
+      const fromRange = buildDisplayFrameApiIndices(
+        tileMeta.validTimes,
+        rangeHours,
+        MAX_MAP_FRAMES,
+        nowMs,
+      )
+      if (fromRange.length > 0) {
+        const labels = fromRange.map((i) => tileMeta.validTimes[i] ?? '')
+        return [fromRange[indexOfFrameNearestToNow(labels, nowMs)]!]
+      }
+      const br = buildRadarDisplayFrameIndexes(tileMeta.tileValidTimesLength, MAX_MAP_FRAMES)
+      return br.length > 0 ? [br[0]!] : [0]
+    }
+    const fromRange = buildDisplayFrameApiIndices(
+      tileMeta.validTimes,
+      rangeHours,
+      MAX_MAP_FRAMES,
+      nowMs,
+    )
+    if (fromRange.length > 0) return fromRange
+    return buildRadarDisplayFrameIndexes(tileMeta.tileValidTimesLength, MAX_MAP_FRAMES)
+  })()
+  const frameTimeLabels = displayIndexes.map((i) => tileMeta.validTimes[i] ?? '')
+  const initialFrameIndex = useStaticSingleFrame ? 0 : indexOfFrameNearestToNow(frameTimeLabels, nowMs)
+
+  const html = buildMapHTML(lat, lon, layer, overlay, {
+    ...tileMeta,
+    frameIndices: displayIndexes,
+    initialFrameIndex,
+  }, frameTimeLabels)
 
   // baseUrl must be a real HTTPS origin so Android WebView allows CDN requests
   const baseUrl = Platform.OS === 'android'
