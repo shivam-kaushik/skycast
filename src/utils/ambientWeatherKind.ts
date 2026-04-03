@@ -1,4 +1,5 @@
 import { isValid, isWithinInterval, parseISO } from 'date-fns'
+import type { HourlyWeather } from '@/src/types/weather'
 
 /** Visual treatment for the home ambient layer (gradients + particles). */
 export type AmbientVisualKind =
@@ -43,4 +44,21 @@ export function getAmbientVisualKind(weatherCode: number, isDay: boolean): Ambie
   if (weatherCode === 2) return isDay ? 'partlyCloudyDay' : 'partlyCloudyNight'
   if (weatherCode === 0 || weatherCode === 1) return isDay ? 'clearDay' : 'clearNight'
   return isDay ? 'partlyCloudyDay' : 'partlyCloudyNight'
+}
+
+/**
+ * WMO codes that should drive rain-style ambient particles (matches rain + thunder branches).
+ * Used to avoid showing “rain” on overcast from precip % alone when hourly icons stay dry.
+ */
+export function isRainishAmbientWeatherCode(code: number): boolean {
+  return RAIN_CODES.has(code) || THUNDER_CODES.has(code)
+}
+
+/** True if any of the first `hours` hourly slots use a rain/thunder WMO code. */
+export function hasRainishHourlyInNextHours(hourly: HourlyWeather, hours: number): boolean {
+  const n = Math.min(Math.max(0, Math.floor(hours)), hourly.weatherCode.length)
+  for (let i = 0; i < n; i++) {
+    if (isRainishAmbientWeatherCode(hourly.weatherCode[i])) return true
+  }
+  return false
 }

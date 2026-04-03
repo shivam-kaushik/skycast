@@ -1,7 +1,29 @@
+import type { HourlyWeather } from '@/src/types/weather'
 import {
   getAmbientVisualKind,
+  hasRainishHourlyInNextHours,
   isDaytimeFromSun,
+  isRainishAmbientWeatherCode,
 } from '@/src/utils/ambientWeatherKind'
+
+function hourlyWithCodes(codes: number[]): HourlyWeather {
+  const n = codes.length
+  const zeros = (): number[] => Array(n).fill(0)
+  return {
+    time: codes.map((_, i) => `2026-06-15T${String(i).padStart(2, '0')}:00:00.000Z`),
+    temperature: zeros(),
+    apparentTemperature: zeros(),
+    precipitationProbability: zeros(),
+    precipitation: zeros(),
+    weatherCode: codes,
+    windSpeed: zeros(),
+    windGusts: zeros(),
+    uvIndex: zeros(),
+    cloudCover: zeros(),
+    visibility: zeros(),
+    humidity: zeros(),
+  }
+}
 
 describe('isDaytimeFromSun', () => {
   it('returns true between sunrise and sunset', () => {
@@ -42,5 +64,33 @@ describe('getAmbientVisualKind', () => {
     expect(getAmbientVisualKind(2, true)).toBe('partlyCloudyDay')
     expect(getAmbientVisualKind(2, false)).toBe('partlyCloudyNight')
     expect(getAmbientVisualKind(45, true)).toBe('fog')
+  })
+})
+
+describe('isRainishAmbientWeatherCode', () => {
+  it('matches drizzle, rain, showers, and thunder', () => {
+    expect(isRainishAmbientWeatherCode(51)).toBe(true)
+    expect(isRainishAmbientWeatherCode(65)).toBe(true)
+    expect(isRainishAmbientWeatherCode(82)).toBe(true)
+    expect(isRainishAmbientWeatherCode(95)).toBe(true)
+  })
+
+  it('excludes dry / cloudy codes', () => {
+    expect(isRainishAmbientWeatherCode(0)).toBe(false)
+    expect(isRainishAmbientWeatherCode(3)).toBe(false)
+    expect(isRainishAmbientWeatherCode(71)).toBe(false)
+  })
+})
+
+describe('hasRainishHourlyInNextHours', () => {
+  it('returns false when window is all overcast', () => {
+    const h = hourlyWithCodes([3, 3, 3, 3])
+    expect(hasRainishHourlyInNextHours(h, 12)).toBe(false)
+  })
+
+  it('returns true when a rain hour appears within the capped window', () => {
+    const h = hourlyWithCodes([3, 3, 61, 3])
+    expect(hasRainishHourlyInNextHours(h, 2)).toBe(false)
+    expect(hasRainishHourlyInNextHours(h, 3)).toBe(true)
   })
 })

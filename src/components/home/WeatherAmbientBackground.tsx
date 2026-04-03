@@ -3,8 +3,9 @@
  *
  * First-party apps (Apple Weather, Samsung Weather) typically use GPU-native pipelines:
  * Metal shaders, high-density particles, and full-scene compositing — not available in JS.
- * Overcast: stratus bands; rain only if max(current, next-12h hourly) precip ≥ threshold.
- * Dedicated rain/thunder WMO codes still use full rain layers.
+ * Overcast: stratus bands; rain only if hourly WMO codes include rain/thunder and
+ * max(current, next-12h hourly) precip ≥ threshold (precip % alone is not enough).
+ * Dedicated rain/thunder WMO codes on current conditions still use full rain layers.
  */
 import React, { memo, useEffect, useMemo } from 'react'
 import { StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -19,6 +20,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
+import ClearDayAmbientLayers from '@/src/components/home/ClearDayAmbientLayers'
 import { getAmbientVisualKind, type AmbientVisualKind } from '@/src/utils/ambientWeatherKind'
 import { rainOpacityForOvercast } from '@/src/utils/overcastRainAmbient'
 
@@ -46,6 +48,11 @@ interface WeatherAmbientBackgroundProps {
   precipitationProbability?: number
   /** Peak hourly precip % in the next ~12h (see home screen). */
   hourlyPrecipitationMax?: number
+  /**
+   * At least one hourly step in the lookahead window has a rain/thunder WMO code.
+   * Overcast rain animation is gated on this so high precip % alone does not imply rain.
+   */
+  hourlyForecastHasRainish?: boolean
 }
 
 function RainDrop({
@@ -115,99 +122,6 @@ function SnowFlake({
     opacity: interpolate(p.value, [0, 0.12, 1], [0.45, 0.95, 0.55]),
   }))
   return <Animated.View style={style} />
-}
-
-function SunGlow() {
-  const pulse = useSharedValue(0)
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    )
-  }, [])
-  const core = useAnimatedStyle(() => ({
-    position: 'absolute' as const,
-    top: '6%',
-    right: '8%',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 230, 150, 0.42)',
-    transform: [{ scale: interpolate(pulse.value, [0, 1], [0.9, 1.1]) }],
-    opacity: interpolate(pulse.value, [0, 1], [0.65, 0.95]),
-  }))
-  const halo = useAnimatedStyle(() => ({
-    position: 'absolute' as const,
-    top: '2%',
-    right: '2%',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: 'rgba(255, 210, 120, 0.2)',
-    transform: [{ scale: interpolate(pulse.value, [0, 1], [0.94, 1.06]) }],
-  }))
-  return (
-    <>
-      <Animated.View style={halo} />
-      <Animated.View style={core} />
-    </>
-  )
-}
-
-/** Soft light rays — slow rotation reads like hazy sun (similar to stock weather UIs). */
-function SunRayBurst() {
-  const spin = useSharedValue(0)
-  useEffect(() => {
-    spin.value = withRepeat(
-      withTiming(1, { duration: 88000, easing: Easing.linear }),
-      -1,
-      false,
-    )
-  }, [])
-  const group = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spin.value * 360}deg` }],
-  }))
-  const rays = useMemo(() => Array.from({ length: 16 }, (_, i) => i), [])
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          top: '4%',
-          right: '4%',
-          width: 240,
-          height: 240,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        group,
-      ]}
-    >
-      {rays.map((i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            width: 240,
-            height: 240,
-            alignItems: 'center',
-            transform: [{ rotate: `${i * 22.5}deg` }],
-          }}
-        >
-          <View
-            style={{
-              width: 3,
-              height: 112,
-              marginTop: 4,
-              borderRadius: 2,
-              backgroundColor: 'rgba(255, 248, 220, 0.28)',
-            }}
-          />
-        </View>
-      ))}
-    </Animated.View>
-  )
 }
 
 function Star({ leftPct, topPct, delayMs, size }: { leftPct: number; topPct: number; delayMs: number; size: number }) {
@@ -328,6 +242,21 @@ function FogLayer() {
   return <Animated.View style={mist} pointerEvents="none" />
 }
 
+/** Darkens lower field slightly so falling rain reads with depth (layered atmosphere). */
+function RainDepthVignette() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <LinearGradient
+        colors={['transparent', 'rgba(6, 10, 18, 0.42)']}
+        locations={[0.5, 1]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+    </View>
+  )
+}
+
 function ThunderFlash() {
   const flash = useSharedValue(0)
   useEffect(() => {
@@ -442,6 +371,7 @@ function WeatherAmbientBackgroundComponent({
   isDay,
   precipitationProbability = 0,
   hourlyPrecipitationMax = 0,
+  hourlyForecastHasRainish = false,
 }: WeatherAmbientBackgroundProps) {
   const { height: winH } = useWindowDimensions()
   const kind = useMemo(() => getAmbientVisualKind(weatherCode, isDay), [weatherCode, isDay])
@@ -450,7 +380,8 @@ function WeatherAmbientBackgroundComponent({
 
   const precipSignal = Math.max(precipitationProbability, hourlyPrecipitationMax)
   const overcastRainLayerOpacity = rainOpacityForOvercast(precipSignal)
-  const showOvercastRain = kind === 'cloudy' && overcastRainLayerOpacity > 0
+  const showOvercastRain =
+    kind === 'cloudy' && hourlyForecastHasRainish && overcastRainLayerOpacity > 0
 
   return (
     <View style={styles.root} pointerEvents="none">
@@ -462,18 +393,12 @@ function WeatherAmbientBackgroundComponent({
 
       {kind === 'clearDay' && <SkyShimmer />}
 
-      {kind === 'clearDay' && (
-        <>
-          <SunRayBurst />
-          <SunGlow />
-        </>
-      )}
+      {kind === 'clearDay' && <ClearDayAmbientLayers variant="clear" />}
 
       {kind === 'partlyCloudyDay' && (
         <>
           <StratusBands variant="partly" />
-          <SunRayBurst />
-          <SunGlow />
+          <ClearDayAmbientLayers variant="partly" />
         </>
       )}
 
@@ -497,6 +422,7 @@ function WeatherAmbientBackgroundComponent({
         <>
           <RainField travel={travel} dropOpacityScale={1.15} count={DROP_COUNT} phase={0} />
           <RainField travel={travel} dropOpacityScale={0.75} count={56} phase={7} />
+          <RainDepthVignette />
         </>
       )}
 

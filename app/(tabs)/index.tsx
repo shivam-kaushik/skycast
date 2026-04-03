@@ -29,7 +29,7 @@ import {
   SECONDARY,
 } from '@/src/theme/colors'
 import { FONT_BOLD, FONT_EXTRABOLD, FONT_MEDIUM } from '@/src/theme/typography'
-import { getAmbientVisualKind, isDaytimeFromSun } from '@/src/utils/ambientWeatherKind'
+import { getAmbientVisualKind, hasRainishHourlyInNextHours, isDaytimeFromSun } from '@/src/utils/ambientWeatherKind'
 import { homeScrimGradient } from '@/src/utils/homeAmbientOverlay'
 import { maxPrecipitationProbabilityNextHours } from '@/src/utils/hourlyPrecipMax'
 
@@ -109,6 +109,7 @@ export default function HomeScreen() {
   const scrim = homeScrimGradient(ambientKind)
   /** Next ~12h window: ambient rain should track “soon” conditions, not tomorrow night’s forecast. */
   const hourlyPrecipMax12h = maxPrecipitationProbabilityNextHours(hourly, 12)
+  const hourlyForecastHasRainish = hasRainishHourlyInNextHours(hourly, 12)
 
   return (
     <View style={styles.root}>
@@ -118,6 +119,7 @@ export default function HomeScreen() {
         isDay={isDay}
         precipitationProbability={current.precipitationProbability}
         hourlyPrecipitationMax={hourlyPrecipMax12h}
+        hourlyForecastHasRainish={hourlyForecastHasRainish}
       />
       <LinearGradient
         colors={scrim.colors}
