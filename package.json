@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "start:lan": "expo start --lan",
+    "start:tunnel": "expo start --tunnel",
+    "postinstall": "patch-package",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
@@ -45,6 +48,7 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
     "@types/react-test-renderer": "^19.1.0",
+    "patch-package": "^8.0.1",
     "react-test-renderer": "19.1.0",
     "tailwindcss": "^3.3.2",
     "typescript": "~5.9.2"
