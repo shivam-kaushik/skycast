@@ -29,8 +29,6 @@ import {
   TEXT_TERTIARY,
   ACCENT,
   ACCENT_SOFT,
-  GHOST_BORDER,
-  GLASS_BG,
   SECONDARY,
 } from '@/src/theme/colors'
 import { FONT_BOLD, FONT_MEDIUM } from '@/src/theme/typography'
@@ -201,21 +199,27 @@ export default function RadarScreen() {
       />
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
-        <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
-          <Ionicons name="location-sharp" size={14} color={ACCENT} />
-          <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
-          <Ionicons name="chevron-down" size={14} color={TEXT_TERTIARY} />
-          <View style={[styles.layerBadge, { borderColor: activeConfig.color }]}>
-            <Text style={[styles.layerBadgeText, { color: activeConfig.color }]}>
-              {activeConfig.description}
+        <View style={styles.topColumn} pointerEvents="box-none">
+          <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
+            <Ionicons name="location-sharp" size={18} color={ACCENT} />
+            <Text style={styles.cityName} numberOfLines={1}>
+              {cityName || 'Your Location'}
             </Text>
+            <Ionicons name="chevron-down" size={18} color={ACCENT_SOFT} />
+            <View style={[styles.layerBadge, { borderColor: activeConfig.color }]}>
+              <Text
+                style={[styles.layerBadgeText, { color: activeConfig.color }]}
+                numberOfLines={2}
+              >
+                {activeConfig.description}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          <View style={styles.legendSlot} pointerEvents="none">
+            <RadarLegend layer={activeLayer} />
           </View>
-        </TouchableOpacity>
+        </View>
       </SafeAreaView>
-
-      <View style={styles.legendOverlay} pointerEvents="none">
-        <RadarLegend layer={activeLayer} />
-      </View>
 
       <View style={[styles.bottomOverlay, { paddingBottom: bottomPad }]} pointerEvents="box-none">
         <View style={styles.layerPill} pointerEvents="auto">
@@ -353,37 +357,47 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
+  topColumn: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    gap: 10,
+    alignSelf: 'stretch',
+  },
   topPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginHorizontal: 16,
-    marginTop: 12,
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: GLASS_BG,
-    borderRadius: 999,
+    paddingVertical: 12,
+    backgroundColor: RADAR_FLOAT_SURFACE,
+    borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: GHOST_BORDER,
+    borderColor: RADAR_FLOAT_BORDER,
     alignSelf: 'stretch',
   },
   cityName: {
     ...FONT_BOLD,
-    fontSize: 16,
+    fontSize: 17,
     color: TEXT_PRIMARY,
     flex: 1,
+    flexShrink: 1,
+    letterSpacing: 0.2,
   },
   layerBadge: {
+    maxWidth: '38%',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
     borderWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   layerBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+  },
+  legendSlot: {
+    alignSelf: 'flex-start',
   },
   bottomOverlay: {
     position: 'absolute',
@@ -391,11 +405,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     gap: 12,
-  },
-  legendOverlay: {
-    position: 'absolute',
-    left: 16,
-    top: 96,
   },
   timelineCard: {
     marginHorizontal: 12,

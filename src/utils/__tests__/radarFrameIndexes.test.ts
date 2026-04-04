@@ -1,8 +1,12 @@
 import {
+  buildCloudFrameIndicesForAnimation,
   buildDisplayFrameApiIndices,
+  extractOpenMeteoSpatialModel,
   filterApiIndicesForwardFromNow,
   filterApiIndicesWithinHoursBeforeLatest,
   indexOfFrameNearestToNow,
+  mapFrameLabelsToNearestValidTimesIndices,
+  sanitizeOmFrameIndices,
   singleApiIndexNearestToNow,
   subsampleChronologicalApiIndices,
 } from '@/src/utils/radarFrameIndexes'
@@ -11,7 +15,7 @@ describe('filterApiIndicesForwardFromNow', () => {
   it('selects instants from a short lookback through now + N hours', () => {
     const now = Date.parse('2026-04-01T15:00:00.000Z')
     const validTimes = [
-      new Date(now - 3 * 3600000).toISOString(),
+      new Date(now - 5 * 3600000).toISOString(),
       new Date(now - 30 * 60000).toISOString(),
       new Date(now + 2 * 3600000).toISOString(),
       new Date(now + 8 * 3600000).toISOString(),
@@ -91,6 +95,81 @@ describe('singleApiIndexNearestToNow', () => {
     ]
     const idx = singleApiIndexNearestToNow(validTimes, 12, now)
     expect(idx).toBe(1)
+  })
+})
+
+describe('sanitizeOmFrameIndices', () => {
+  it('clamps, floors, and dedupes in order', () => {
+    expect(sanitizeOmFrameIndices([-1, 2.9, 2.9, 99], 5)).toEqual([0, 2, 4])
+  })
+
+  it('returns empty when length is 0', () => {
+    expect(sanitizeOmFrameIndices([0, 1], 0)).toEqual([])
+  })
+})
+
+describe('extractOpenMeteoSpatialModel', () => {
+  it('reads the data_spatial model segment', () => {
+    expect(
+      extractOpenMeteoSpatialModel(
+        'https://map-tiles.open-meteo.com/data_spatial/dwd_icon/latest.json?variable=precipitation',
+      ),
+    ).toBe('dwd_icon')
+  })
+})
+
+describe('buildCloudFrameIndicesForAnimation', () => {
+  it('reuses tile indices when same model and matching valid_times length', () => {
+    const url =
+      'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=precipitation'
+    const cloudUrl =
+      'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=cloud_cover'
+    const vt = Array.from({ length: 20 }, (_, i) => new Date(1_700_000_000_000 + i * 3600000).toISOString())
+    const idx = [2, 5, 9]
+    const labels = idx.map((i) => vt[i] ?? '')
+    expect(
+      buildCloudFrameIndicesForAnimation(idx, labels, vt.length, vt, vt.length, url, cloudUrl),
+    ).toEqual([2, 5, 9])
+  })
+
+  it('falls back to time mapping when models differ', () => {
+    const tileUrl =
+      'https://map-tiles.open-meteo.com/data_spatial/dwd_icon/latest.json?variable=precipitation'
+    const cloudUrl =
+      'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=cloud_cover'
+    const precipT = ['2026-04-01T12:00:00.000Z', '2026-04-01T15:00:00.000Z']
+    const cloudT = ['2026-04-01T11:00:00.000Z', '2026-04-01T12:00:00.000Z', '2026-04-01T15:00:00.000Z']
+    expect(
+      buildCloudFrameIndicesForAnimation([10, 11], precipT, 100, cloudT, cloudT.length, tileUrl, cloudUrl),
+    ).toEqual([1, 2])
+  })
+})
+
+describe('mapFrameLabelsToNearestValidTimesIndices', () => {
+  it('maps each frame label to the nearest secondary valid_times index', () => {
+    const cloud = [
+      '2026-04-01T10:00:00.000Z',
+      '2026-04-01T12:00:00.000Z',
+      '2026-04-01T14:00:00.000Z',
+    ]
+    const precipLabels = ['2026-04-01T11:30:00.000Z', '2026-04-01T13:45:00.000Z']
+    expect(mapFrameLabelsToNearestValidTimesIndices(precipLabels, cloud)).toEqual([1, 2])
+  })
+
+  it('avoids clamping many precip steps to one cloud index when lengths differ', () => {
+    const cloud = Array.from({ length: 5 }, (_, i) =>
+      new Date(Date.parse('2026-04-01T12:00:00.000Z') + i * 3600000).toISOString(),
+    )
+    const precipLabels = [
+      new Date(Date.parse('2026-04-01T12:00:00.000Z') + 0 * 3600000).toISOString(),
+      new Date(Date.parse('2026-04-01T12:00:00.000Z') + 2 * 3600000).toISOString(),
+      new Date(Date.parse('2026-04-01T12:00:00.000Z') + 4 * 3600000).toISOString(),
+    ]
+    const rawPrecipIndicesWouldClamp = [50, 52, 54]
+    expect(rawPrecipIndicesWouldClamp.every((i) => Math.min(i, cloud.length - 1) === cloud.length - 1)).toBe(
+      true,
+    )
+    expect(mapFrameLabelsToNearestValidTimesIndices(precipLabels, cloud)).toEqual([0, 2, 4])
   })
 })
 

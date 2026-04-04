@@ -38,6 +38,7 @@ describe('buildMapHTML', () => {
         windVectorSourceUrl,
         windVectorValidTimesLength: 12,
         frameIndices: [0, 4, 8, 11],
+        cloudFrameIndices: [0, 4, 8, 11],
         initialFrameIndex: 0,
       },
       ['2025-01-01T12:00:00Z', '2025-01-01T15:00:00Z'],
@@ -47,6 +48,7 @@ describe('buildMapHTML', () => {
     expect(html).toContain(`var TILE_SOURCE_URL = '${tileSourceUrl}';`)
     expect(html).toContain('var TILE_VALID_TIMES_COUNT = 12;')
     expect(html).toContain('var FRAME_INDICES = [0,4,8,11];')
+    expect(html).toContain('var CLOUD_FRAME_INDICES = [0,4,8,11];')
     expect(html).toContain('addLeafletProtocolSupport')
   })
 })

@@ -6,9 +6,11 @@ import type { AirQualityData } from '@/src/types/weather'
 import { useOmeteoMapTileMetadata } from '@/src/hooks/useOmeteoMapTileMetadata'
 import { type MapLayer } from '@/src/components/radar/mapLayerConfig'
 import {
+  buildCloudFrameIndicesForAnimation,
   buildDisplayFrameApiIndices,
   buildRadarDisplayFrameIndexes,
   indexOfFrameNearestToNow,
+  sanitizeOmFrameIndices,
   singleApiIndexNearestToNow,
 } from '@/src/utils/radarFrameIndexes'
 
@@ -58,6 +60,8 @@ export function buildMapHTML(
     windVectorValidTimesLength?: number
     /** Open-Meteo `valid_times_*` indices (chronological order), already subsampled. */
     frameIndices: number[]
+    /** Per-animation-frame indices into the cloud layer’s `valid_times` (aligned by timestamp). */
+    cloudFrameIndices: number[]
     /** Start animation on the frame whose valid time is nearest to load time (usually “now”). */
     initialFrameIndex: number
   },
@@ -73,8 +77,6 @@ export function buildMapHTML(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@openmeteo/mapbox-layer@0.0.16/dist/index.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #0A0F1E; overflow: hidden; }
@@ -107,7 +109,38 @@ export function buildMapHTML(
 </head>
 <body>
 <div id="map"></div>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@openmeteo/mapbox-layer@0.0.16/dist/index.js"></script>
 <script>
+(function skycastMapBoot() {
+  function reportError(m) {
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(m) }));
+    } catch (_) {}
+  }
+  var libRetries = 0;
+  function waitLibs(cb) {
+    var OM = window.OpenMeteoMapboxLayer;
+    if (
+      typeof L !== 'undefined' &&
+      OM &&
+      typeof OM.addLeafletProtocolSupport === 'function' &&
+      OM.omProtocol
+    ) {
+      cb();
+      return;
+    }
+    libRetries++;
+    if (libRetries > 240) {
+      reportError('Leaflet or Open-Meteo library did not load in time');
+      return;
+    }
+    setTimeout(function () {
+      waitLibs(cb);
+    }, 50);
+  }
+  waitLibs(function () {
+    try {
   var LAT = ${lat};
   var LON = ${lon};
   var LAYER = '${layer}';
@@ -121,8 +154,17 @@ export function buildMapHTML(
   var MAX_FRAMES = 8;
   var OM_MAX_NATIVE_ZOOM = 12;
   var FRAME_INDICES = ${JSON.stringify(params.frameIndices)};
+  var CLOUD_FRAME_INDICES = ${JSON.stringify(params.cloudFrameIndices)};
   var FRAME_TIME_LABELS = ${JSON.stringify(frameTimeLabels)};
   var INITIAL_FRAME_INDEX = ${params.initialFrameIndex};
+
+  // Register om:// before map init (Open-Meteo adapter expects this order)
+  var omMod = window.OpenMeteoMapboxLayer || window.OMWeatherMapLayer;
+  if (!omMod || !omMod.addLeafletProtocolSupport || !omMod.omProtocol) {
+    throw new Error('Open-Meteo map layer runtime missing');
+  }
+  var omAdapter = omMod.addLeafletProtocolSupport(L);
+  omAdapter.addProtocol('om', omMod.omProtocol);
 
   var map = L.map('map', {
     center: [LAT, LON],
@@ -130,20 +172,20 @@ export function buildMapHTML(
     maxZoom: 19,
     zoomControl: false,
     attributionControl: false,
-    preferCanvas: true
+    preferCanvas: false,
   });
 
-  // Panes (control z-order deterministically)
+  // Panes: labels sit *below* weather so Carto label tiles do not paint over precip/clouds
   map.createPane('basePane');
   map.getPane('basePane').style.zIndex = 200;
   map.createPane('labelPane');
-  map.getPane('labelPane').style.zIndex = 340;
+  map.getPane('labelPane').style.zIndex = 300;
   map.createPane('cloudPane');
-  map.getPane('cloudPane').style.zIndex = 310;
+  map.getPane('cloudPane').style.zIndex = 400;
   map.createPane('dataPane');
-  map.getPane('dataPane').style.zIndex = 320;
+  map.getPane('dataPane').style.zIndex = 410;
   map.createPane('vectorPane');
-  map.getPane('vectorPane').style.zIndex = 330;
+  map.getPane('vectorPane').style.zIndex = 420;
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
@@ -154,7 +196,7 @@ export function buildMapHTML(
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
-    opacity: 0.92,
+    opacity: 0.88,
     pane: 'labelPane',
   }).addTo(map);
 
@@ -167,16 +209,6 @@ export function buildMapHTML(
   });
   L.marker([LAT, LON], { icon: pulseIcon }).addTo(map);
 
-  function installOmProtocol() {
-    var omModule = window.OpenMeteoMapboxLayer || window.OMWeatherMapLayer;
-    if (!omModule || !omModule.addLeafletProtocolSupport || !omModule.omProtocol) {
-      throw new Error('Open-Meteo map layer runtime missing');
-    }
-    var adapter = omModule.addLeafletProtocolSupport(L);
-    adapter.addProtocol('om', omModule.omProtocol);
-    return adapter;
-  }
-
   function setupAnimatedOverlay() {
     var isPlaying = true;
     var radarFrames = [];
@@ -184,7 +216,7 @@ export function buildMapHTML(
     var cloudFrames = [];
     var currentFrame = 0;
     var animTimer = null;
-    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.22 : 0;
+    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.5 : 0;
 
     function setLayerOpacity(layer, opacity) {
       if (!layer) return;
@@ -210,16 +242,35 @@ export function buildMapHTML(
       } catch (_) {}
     }
 
+    /** Open-Meteo canvas tiles under cloudPane often ignore opacity-only toggles in WebView — hide the DOM node. */
+    function setLayerDomDisplayed(layer, displayed) {
+      if (!layer) return;
+      try {
+        if (typeof layer.getElement === 'function') {
+          var el = layer.getElement();
+          if (el && el.style) el.style.display = displayed ? '' : 'none';
+        }
+      } catch (_) {}
+      try {
+        if (layer._container && layer._container.style) {
+          layer._container.style.display = displayed ? '' : 'none';
+        }
+      } catch (_) {}
+    }
+
     function showFrame(idx) {
       for (var i = 0; i < radarFrames.length; i++) {
-        var activeOpacity = LAYER === 'wind' ? 0.56 : (LAYER === 'temperature' ? 0.86 : 0.66);
+        var activeOpacity =
+          LAYER === 'wind' ? 0.56 : LAYER === 'temperature' ? 0.86 : LAYER === 'precipitation' ? 0.82 : 0.66;
         setLayerOpacity(radarFrames[i].layer, i === idx ? activeOpacity : 0);
       }
       for (var v = 0; v < windVectorFrames.length; v++) {
         setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.9 : 0);
       }
       for (var j = 0; j < cloudFrames.length; j++) {
-        setLayerOpacity(cloudFrames[j].layer, j === idx ? cloudActiveOpacity : 0);
+        var cloudOn = j === idx;
+        setLayerOpacity(cloudFrames[j].layer, cloudOn ? cloudActiveOpacity : 0);
+        setLayerDomDisplayed(cloudFrames[j].layer, cloudOn);
       }
       try {
         window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -258,11 +309,11 @@ export function buildMapHTML(
       return indexes;
     }
 
-    var adapter = null;
-    try {
-      adapter = installOmProtocol();
-    } catch (e) {
-      try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(e) })); } catch(_) {}
+    var adapter = omAdapter;
+    if (!adapter) {
+      try {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: 'Open-Meteo adapter not registered' }));
+      } catch (_) {}
       return;
     }
 
@@ -284,23 +335,33 @@ export function buildMapHTML(
     var frameCount = frameIndexes.length;
 
     for (var i = 0; i < frameIndexes.length; i++) {
-      var timeIndex = frameIndexes[i];
+      var rawTi = frameIndexes[i];
+      var timeIndex = Math.max(0, Math.min(Math.floor(Number(rawTi)), TILE_VALID_TIMES_COUNT - 1));
       var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
-        opacity: i === 0 ? (LAYER === 'wind' ? 0.56 : (LAYER === 'temperature' ? 0.86 : 0.66)) : 0,
+        opacity:
+          i === 0
+            ? LAYER === 'wind'
+              ? 0.56
+              : LAYER === 'temperature'
+                ? 0.86
+                : LAYER === 'precipitation'
+                  ? 0.82
+                  : 0.66
+            : 0,
         maxNativeZoom: OM_MAX_NATIVE_ZOOM,
         maxZoom: 19,
         zIndex: 10,
         pane: 'dataPane',
       });
       tileLayer.addTo(map);
-      try { if (typeof tileLayer.setZIndex === 'function') tileLayer.setZIndex(320); } catch (_) {}
+      try { if (typeof tileLayer.setZIndex === 'function') tileLayer.setZIndex(410); } catch (_) {}
       radarFrames.push({ layer: tileLayer });
     }
 
     if (LAYER === 'wind' && WIND_VECTOR_SOURCE_URL && WIND_VECTOR_VALID_TIMES_COUNT > 0) {
       for (var k = 0; k < frameIndexes.length; k++) {
-        var vectorTimeIndex = Math.min(frameIndexes[k], WIND_VECTOR_VALID_TIMES_COUNT - 1);
+        var vectorTimeIndex = Math.max(0, Math.min(Math.floor(Number(frameIndexes[k])), WIND_VECTOR_VALID_TIMES_COUNT - 1));
         var vecOmUrl = WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
         var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, {
           opacity: k === 0 ? 0.88 : 0,
@@ -331,14 +392,15 @@ export function buildMapHTML(
           }
         });
         vectorLayer.addTo(map);
-        try { if (typeof vectorLayer.setZIndex === 'function') vectorLayer.setZIndex(330); } catch (_) {}
+        try { if (typeof vectorLayer.setZIndex === 'function') vectorLayer.setZIndex(420); } catch (_) {}
         windVectorFrames.push({ layer: vectorLayer });
       }
     }
 
     if (CLOUD_VALID_TIMES_COUNT > 0 && cloudActiveOpacity > 0) {
       for (var j = 0; j < frameIndexes.length; j++) {
-        var cloudTimeIndex = Math.min(frameIndexes[j], CLOUD_VALID_TIMES_COUNT - 1);
+        var cloudIdxRaw = (CLOUD_FRAME_INDICES && CLOUD_FRAME_INDICES.length > j) ? CLOUD_FRAME_INDICES[j] : frameIndexes[j];
+        var cloudTimeIndex = Math.max(0, Math.min(Math.floor(Number(cloudIdxRaw)), CLOUD_VALID_TIMES_COUNT - 1));
         var omCloudUrl = CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
         var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
           opacity: j === 0 ? cloudActiveOpacity : 0,
@@ -348,7 +410,7 @@ export function buildMapHTML(
           pane: 'cloudPane',
         });
         cloudLayer.addTo(map);
-        try { if (typeof cloudLayer.setZIndex === 'function') cloudLayer.setZIndex(310); } catch (_) {}
+        try { if (typeof cloudLayer.setZIndex === 'function') cloudLayer.setZIndex(400); } catch (_) {}
         cloudFrames.push({ layer: cloudLayer });
       }
     }
@@ -386,13 +448,14 @@ export function buildMapHTML(
     setupAnimatedOverlay();
   }
 
-  // Surface JS/runtime errors back to React Native (avoid silent failures)
-  window.onerror = function(message, source, lineno, colno, error) {
+  window.onerror = function (message, source, lineno, colno, error) {
     try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'error',
-        msg: String(message || (error && error.message) || 'Unknown WebView error')
-      }));
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: 'error',
+          msg: String(message || (error && error.message) || 'Unknown WebView error'),
+        }),
+      );
     } catch (_) {}
     return false;
   };
@@ -469,6 +532,11 @@ export function buildMapHTML(
     var aqiIcon = L.divIcon({ className: '', html: aqiHTML, iconSize: [100, 66], iconAnchor: [50, 80] });
     L.marker([LAT, LON], { icon: aqiIcon }).addTo(map);
   }
+    } catch (skycastInitErr) {
+      reportError(skycastInitErr && skycastInitErr.message ? skycastInitErr.message : String(skycastInitErr));
+    }
+  });
+})();
 </script>
 </body>
 </html>`
@@ -560,11 +628,18 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
   const nowMs = Date.now()
   const rangeHours = timelineRange === '1h' ? 1 : 12
   const useStaticSingleFrame = STATIC_MAP_LAYERS.includes(layer)
-
   const displayIndexes = (() => {
+    const tl = tileMeta.tileValidTimesLength
+    const finalize = (raw: number[]): number[] => {
+      const cleaned = sanitizeOmFrameIndices(raw, tl)
+      if (cleaned.length > 0) return cleaned
+      const fallback = buildRadarDisplayFrameIndexes(tl, MAX_MAP_FRAMES)
+      return sanitizeOmFrameIndices(fallback, tl)
+    }
+
     if (useStaticSingleFrame) {
       const one = singleApiIndexNearestToNow(tileMeta.validTimes, rangeHours, nowMs)
-      if (one !== null) return [one]
+      if (one !== null) return finalize([one])
       const fromRange = buildDisplayFrameApiIndices(
         tileMeta.validTimes,
         rangeHours,
@@ -573,10 +648,10 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       )
       if (fromRange.length > 0) {
         const labels = fromRange.map((i) => tileMeta.validTimes[i] ?? '')
-        return [fromRange[indexOfFrameNearestToNow(labels, nowMs)]!]
+        return finalize([fromRange[indexOfFrameNearestToNow(labels, nowMs)]!])
       }
       const br = buildRadarDisplayFrameIndexes(tileMeta.tileValidTimesLength, MAX_MAP_FRAMES)
-      return br.length > 0 ? [br[0]!] : [0]
+      return finalize(br.length > 0 ? [br[0]!] : [0])
     }
     const fromRange = buildDisplayFrameApiIndices(
       tileMeta.validTimes,
@@ -584,15 +659,25 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       MAX_MAP_FRAMES,
       nowMs,
     )
-    if (fromRange.length > 0) return fromRange
-    return buildRadarDisplayFrameIndexes(tileMeta.tileValidTimesLength, MAX_MAP_FRAMES)
+    if (fromRange.length > 0) return finalize(fromRange)
+    return finalize(buildRadarDisplayFrameIndexes(tileMeta.tileValidTimesLength, MAX_MAP_FRAMES))
   })()
   const frameTimeLabels = displayIndexes.map((i) => tileMeta.validTimes[i] ?? '')
   const initialFrameIndex = useStaticSingleFrame ? 0 : indexOfFrameNearestToNow(frameTimeLabels, nowMs)
+  const cloudFrameIndices = buildCloudFrameIndicesForAnimation(
+    displayIndexes,
+    frameTimeLabels,
+    tileMeta.tileValidTimesLength,
+    tileMeta.cloudValidTimes ?? [],
+    tileMeta.cloudValidTimesLength,
+    tileMeta.tileSourceUrl,
+    tileMeta.cloudSourceUrl,
+  )
 
   const html = buildMapHTML(lat, lon, layer, overlay, {
     ...tileMeta,
     frameIndices: displayIndexes,
+    cloudFrameIndices,
     initialFrameIndex,
   }, frameTimeLabels)
 
@@ -634,7 +719,6 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
         startInLoadingState={false}
         onLoadEnd={() => {
           setMapLoading(false)
-          setMapError(false)
         }}
         onError={() => { setMapLoading(false); setMapError(true) }}
         onHttpError={() => { setMapLoading(false); setMapError(true) }}

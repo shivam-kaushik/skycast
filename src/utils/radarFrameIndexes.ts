@@ -22,9 +22,15 @@ export type RadarTimelineRangeHours = 1 | 12
 
 const HOUR_MS = 60 * 60 * 1000
 
-/** Lookback so “now” sits inside the window with typical 3-hourly model steps. */
-const LOOKBACK_1H_MS = 45 * 60 * 1000
-const LOOKBACK_12H_MS = 60 * 60 * 1000
+/**
+ * Lookback before `now` so at least one model step usually falls inside the window
+ * (hourly ECMWF/ICON steps can sit just outside a tight 45–60 min margin).
+ */
+const LOOKBACK_1H_MS = 2 * HOUR_MS
+const LOOKBACK_12H_MS = 3 * HOUR_MS
+
+/** Small cushion past `now + hours` so a step ending exactly on the boundary is kept. */
+const FORWARD_CUSHION_MS = 45 * 60 * 1000
 
 /**
  * Indices into `valid_times` sorted by time: **current time through the next `hours`**
@@ -44,7 +50,7 @@ export function filterApiIndicesForwardFromNow(
   if (pairs.length === 0) return []
 
   const lookback = hours <= 1 ? LOOKBACK_1H_MS : LOOKBACK_12H_MS
-  const forwardEnd = nowMs + hours * HOUR_MS
+  const forwardEnd = nowMs + hours * HOUR_MS + FORWARD_CUSHION_MS
   const winStart = nowMs - lookback
 
   let inWindow = pairs.filter((p) => p.t >= winStart && p.t <= forwardEnd)
@@ -158,6 +164,91 @@ export function singleApiIndexNearestToNow(
 }
 
 /** Pick animation frame index whose label time is closest to `nowMs` (for map + scrubber sync). */
+/**
+ * Clamp Open-Meteo `valid_times_*` indices and drop duplicates (stale metadata / rounding).
+ */
+export function sanitizeOmFrameIndices(indices: readonly number[], validTimesLength: number): number[] {
+  const max = Math.max(0, validTimesLength - 1)
+  const out: number[] = []
+  const seen = new Set<number>()
+  for (const raw of indices) {
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) continue
+    const c = Math.min(Math.max(0, Math.floor(raw)), max)
+    if (seen.has(c)) continue
+    seen.add(c)
+    out.push(c)
+  }
+  return out
+}
+
+/**
+ * For each animation frame’s ISO label, pick the index into `secondaryValidTimes` whose instant is
+ * closest in time. Use when a companion layer (e.g. cloud_cover) shares the model run but has its
+ * own `valid_times` length — reusing primary tile indices would clamp many frames to one step.
+ */
+/** `data_spatial/<model>/` segment from an Open-Meteo map tile metadata URL. */
+export function extractOpenMeteoSpatialModel(tileMetadataUrl: string): string | null {
+  const m = tileMetadataUrl.match(/data_spatial\/([^/]+)\//)
+  return m?.[1] ?? null
+}
+
+/**
+ * Cloud `time_step` indices for each precip animation frame. Prefer raw tile indices when the
+ * cloud dataset is the same model and shares the same `valid_times` length; otherwise map by time.
+ */
+export function buildCloudFrameIndicesForAnimation(
+  displayIndexes: readonly number[],
+  frameTimeLabels: readonly string[],
+  tileValidTimesLength: number,
+  cloudValidTimes: readonly string[],
+  cloudValidTimesLength: number,
+  tileSourceUrl: string,
+  cloudSourceUrl: string,
+): number[] {
+  const cloudIdxMax = Math.max(0, cloudValidTimesLength - 1)
+  const tileModel = extractOpenMeteoSpatialModel(tileSourceUrl)
+  const cloudModel = extractOpenMeteoSpatialModel(cloudSourceUrl)
+  const sameModel = tileModel !== null && tileModel === cloudModel
+  const lenMatch =
+    tileValidTimesLength === cloudValidTimesLength &&
+    cloudValidTimes.length === cloudValidTimesLength &&
+    cloudValidTimesLength > 0
+
+  if (sameModel && lenMatch) {
+    return displayIndexes.map((i) => Math.min(Math.max(0, Math.floor(i)), cloudIdxMax))
+  }
+
+  const times = cloudValidTimes.length > 0 ? cloudValidTimes : []
+  return mapFrameLabelsToNearestValidTimesIndices(frameTimeLabels, times).map((i) =>
+    Math.min(Math.max(0, Math.floor(i)), cloudIdxMax),
+  )
+}
+
+export function mapFrameLabelsToNearestValidTimesIndices(
+  frameTimeLabels: readonly string[],
+  secondaryValidTimes: readonly string[],
+): number[] {
+  if (secondaryValidTimes.length === 0) {
+    return frameTimeLabels.map(() => 0)
+  }
+  return frameTimeLabels.map((label) => {
+    const t = parseTimelineInstant(label)
+    if (!t) return 0
+    let best = 0
+    let bestDist = Infinity
+    for (let i = 0; i < secondaryValidTimes.length; i++) {
+      const d = parseTimelineInstant(secondaryValidTimes[i] ?? '')
+      if (!d) continue
+      const dist = Math.abs(d.getTime() - t.getTime())
+      if (dist < bestDist) {
+        bestDist = dist
+        best = i
+      }
+    }
+    return best
+  })
+}
+
 export function indexOfFrameNearestToNow(
   frameTimeLabels: readonly string[],
   nowMs: number = Date.now(),

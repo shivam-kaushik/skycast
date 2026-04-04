@@ -4,6 +4,10 @@ import type { MapLayer } from '@/src/components/radar/mapLayerConfig'
 import { TEXT_PRIMARY, TEXT_SECONDARY } from '@/src/theme/colors'
 import { getRadarLegend } from '@/src/utils/radarLegend'
 
+/** Match radar screen floaters (timeline / location bar) */
+const LEGEND_SURFACE = 'rgba(26, 31, 47, 0.93)'
+const LEGEND_BORDER = 'rgba(222, 225, 247, 0.16)'
+
 interface RadarLegendProps {
   layer: MapLayer
 }
@@ -38,9 +42,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: 16,
-    backgroundColor: 'rgba(20,26,40,0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: LEGEND_SURFACE,
+    borderWidth: 1.5,
+    borderColor: LEGEND_BORDER,
   },
   title: {
     color: TEXT_PRIMARY,

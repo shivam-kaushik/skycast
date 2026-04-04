@@ -16,6 +16,8 @@ type OmeteoTileMetadata = {
   validTimes: string[]
   cloudSourceUrl: string
   cloudValidTimesLength: number
+  /** Same order as cloud tile `time_step=valid_times_*` (align animation by timestamp, not primary indices). */
+  cloudValidTimes: string[]
   windVectorSourceUrl?: string
   windVectorValidTimesLength?: number
 }
@@ -80,6 +82,25 @@ async function selectFirstNonEmptySource(
   return null
 }
 
+/** Prefer `cloud_cover` from the same spatial model as the selected tile (shared `valid_times`). */
+function cloudMetadataCandidateUrls(tileUrl: string): string[] {
+  const m = tileUrl.match(/data_spatial\/([^/]+)\//)
+  const paired =
+    m?.[1] != null
+      ? `https://map-tiles.open-meteo.com/data_spatial/${m[1]}/latest.json?variable=cloud_cover`
+      : null
+  const fallbacks = [
+    'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=cloud_cover',
+    'https://map-tiles.open-meteo.com/data_spatial/dwd_icon/latest.json?variable=cloud_cover',
+  ]
+  const out: string[] = []
+  if (paired) out.push(paired)
+  for (const u of fallbacks) {
+    if (!out.includes(u)) out.push(u)
+  }
+  return out
+}
+
 function deriveWindVectorSourceUrl(rasterSourceUrl: string): string {
   // Raster source URL contains `variable=<something>`. We swap it to U-component for directional arrows.
   let windVectorSourceUrl = rasterSourceUrl.replace(/variable=[^&]+/, 'variable=wind_u_component_10m')
@@ -101,11 +122,7 @@ export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: 
       const selectedTile = await selectFirstNonEmptySource(tileCandidates)
       if (!selectedTile) return null
 
-      const cloudCandidates = [
-        'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=cloud_cover',
-        'https://map-tiles.open-meteo.com/data_spatial/dwd_icon/latest.json?variable=cloud_cover',
-      ]
-      const selectedCloud = await selectFirstNonEmptySource(cloudCandidates)
+      const selectedCloud = await selectFirstNonEmptySource(cloudMetadataCandidateUrls(selectedTile.url))
       if (!selectedCloud) return null
 
       if (layer === 'wind') {
@@ -117,6 +134,7 @@ export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: 
           validTimes: selectedTile.validTimes,
           cloudSourceUrl: selectedCloud.url,
           cloudValidTimesLength: selectedCloud.length,
+          cloudValidTimes: selectedCloud.validTimes,
           windVectorSourceUrl,
           windVectorValidTimesLength,
         }
@@ -128,6 +146,7 @@ export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: 
         validTimes: selectedTile.validTimes,
         cloudSourceUrl: selectedCloud.url,
         cloudValidTimesLength: selectedCloud.length,
+        cloudValidTimes: selectedCloud.validTimes,
       }
     },
   })
