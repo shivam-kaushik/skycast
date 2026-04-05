@@ -56,28 +56,28 @@ const LAYERS: LayerConfig[] = [
     label: 'Radar',
     icon: 'rainy-outline',
     color: SECONDARY,
-    description: 'Forecast precipitation (next hours)',
+    description: 'Model precipitation (timeline loop)',
   },
   {
     key: 'temperature',
     label: 'Temp',
     icon: 'thermometer-outline',
     color: ACCENT_SOFT,
-    description: 'Forecast temperature (next hours)',
+    description: 'Model temperature (nearest time)',
   },
   {
     key: 'wind',
     label: 'Wind',
     icon: 'navigate-outline',
     color: '#06D6A0',
-    description: 'Forecast wind & gusts (next hours)',
+    description: 'Model wind & gusts (timeline loop)',
   },
   {
     key: 'air',
     label: 'Air',
     icon: 'leaf-outline',
     color: '#FFD166',
-    description: 'Forecast air quality (next hours)',
+    description: 'Model air quality (nearest time)',
   },
 ]
 
@@ -103,7 +103,6 @@ export default function RadarScreen() {
   const [isPlaying, setIsPlaying] = useState(true)
   const [frameIndex, setFrameIndex] = useState(0)
   const [totalFrames, setTotalFrames] = useState(0)
-  const [range, setRange] = useState<'1h' | '12h'>('12h')
   const [isPickerOpen, setPickerOpen] = useState(false)
   const [frameTimes, setFrameTimes] = useState<string[]>([])
   const [currentTimeIso, setCurrentTimeIso] = useState<string | null>(null)
@@ -147,17 +146,7 @@ export default function RadarScreen() {
     setFrameTimes([])
     setCurrentTimeIso(null)
     setIsPlaying(true)
-  }, [activeLayer, lat, lon, range])
-
-  /** Hours ahead of real “now” for the selected frame (+/-), not slider position. */
-  const offsetHoursFromNow = (() => {
-    if (!currentTimeIso) return 0
-    const d = parseTimelineInstant(currentTimeIso)
-    if (!d) return 0
-    const dh = (d.getTime() - Date.now()) / (60 * 60 * 1000)
-    if (Math.abs(dh) < 0.2) return 0
-    return Math.round(dh)
-  })()
+  }, [activeLayer, lat, lon])
 
   if (isLoading || !weather) {
     return (
@@ -193,7 +182,6 @@ export default function RadarScreen() {
         layer={activeLayer}
         weather={weather}
         airQuality={airQuality}
-        timelineRange={range}
         onFrameUpdate={handleFrameUpdate}
         onTimelineReady={handleTimelineReady}
       />
@@ -267,40 +255,9 @@ export default function RadarScreen() {
                   {formatHeroTime(currentTimeIso)}
                 </Text>
               </View>
-              <View style={styles.rangeToggle}>
-                <Pressable
-                  style={[styles.rangeChip, range === '1h' && styles.rangeChipActive]}
-                  onPress={() => setRange('1h')}
-                >
-                  <Text
-                    style={[styles.rangeChipLabel, range === '1h' && styles.rangeChipLabelActive]}
-                  >
-                    1h
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.rangeChip, range === '12h' && styles.rangeChipActive]}
-                  onPress={() => setRange('12h')}
-                >
-                  <Text
-                    style={[styles.rangeChipLabel, range === '12h' && styles.rangeChipLabelActive]}
-                  >
-                    12h
-                  </Text>
-                </Pressable>
-              </View>
-              <View style={styles.offsetBadge}>
-                <Text style={styles.offsetText}>
-                  {offsetHoursFromNow === 0
-                    ? 'Now'
-                    : offsetHoursFromNow > 0
-                      ? `+${offsetHoursFromNow}h`
-                      : `${offsetHoursFromNow}h`}
-                </Text>
-              </View>
             </View>
             <RadarTimeScrubber
-              key={`${activeLayer}-${totalFrames}-${range}`}
+              key={`${activeLayer}-${totalFrames}`}
               times={Array.from({ length: totalFrames }, (_, i) => frameTimes[i] ?? '')}
               selectedIndex={Math.min(frameIndex, Math.max(0, totalFrames - 1))}
               onSelectIndex={onSelectFrame}
@@ -448,44 +405,6 @@ const styles = StyleSheet.create({
     ...FONT_BOLD,
     fontSize: 16,
     color: ACCENT_SOFT,
-  },
-  rangeToggle: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.32)',
-    borderRadius: 999,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(222, 225, 247, 0.1)',
-  },
-  rangeChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  rangeChipActive: {
-    backgroundColor: 'rgba(255, 193, 7, 0.22)',
-  },
-  rangeChipLabel: {
-    ...FONT_MEDIUM,
-    fontSize: 11,
-    color: TEXT_TERTIARY,
-  },
-  rangeChipLabelActive: {
-    color: ACCENT_SOFT,
-  },
-  offsetBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 193, 7, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 193, 7, 0.3)',
-  },
-  offsetText: {
-    ...FONT_BOLD,
-    fontSize: 10,
-    color: ACCENT_SOFT,
-    letterSpacing: 0.3,
   },
   layerPill: {
     flexDirection: 'row',

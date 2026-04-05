@@ -1,12 +1,14 @@
 import {
   buildCloudFrameIndicesForAnimation,
   buildDisplayFrameApiIndices,
+  buildFullModelDisplayFrameIndices,
   extractOpenMeteoSpatialModel,
   filterApiIndicesForwardFromNow,
   filterApiIndicesWithinHoursBeforeLatest,
   indexOfFrameNearestToNow,
   mapFrameLabelsToNearestValidTimesIndices,
   sanitizeOmFrameIndices,
+  singleApiIndexNearestInTimeline,
   singleApiIndexNearestToNow,
   subsampleChronologicalApiIndices,
 } from '@/src/utils/radarFrameIndexes'
@@ -105,6 +107,28 @@ describe('sanitizeOmFrameIndices', () => {
 
   it('returns empty when length is 0', () => {
     expect(sanitizeOmFrameIndices([0, 1], 0)).toEqual([])
+  })
+})
+
+describe('buildFullModelDisplayFrameIndices', () => {
+  it('subsamples the full timeline without empty result for typical lengths', () => {
+    const raw = buildFullModelDisplayFrameIndices(109, 8)
+    const cleaned = sanitizeOmFrameIndices(raw, 109)
+    expect(cleaned.length).toBeGreaterThan(0)
+    expect(cleaned[0]).toBe(0)
+    expect(cleaned[cleaned.length - 1]).toBe(108)
+  })
+})
+
+describe('singleApiIndexNearestInTimeline', () => {
+  it('picks the index closest to now', () => {
+    const now = Date.parse('2026-04-01T15:30:00.000Z')
+    const validTimes = [
+      '2026-04-01T12:00:00.000Z',
+      '2026-04-01T15:00:00.000Z',
+      '2026-04-01T18:00:00.000Z',
+    ]
+    expect(singleApiIndexNearestInTimeline(validTimes, now)).toBe(1)
   })
 })
 

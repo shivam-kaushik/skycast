@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getTileMetadataUrls, type MapLayer } from '@/src/components/radar/mapLayerConfig'
+import { validateOpenMeteoValidTimesPayload } from '@/src/utils/openMeteoMapTileValidation'
 
 const STALE_TIME = 5 * 60 * 1000
 const REFETCH_INTERVAL = 10 * 60 * 1000
@@ -59,8 +60,9 @@ function getValidTimesLength(json: TileMetadataJson): number {
 async function fetchValidTimes(url: string): Promise<string[]> {
   const res = await fetch(url)
   if (!res.ok) return []
-  const json = (await res.json()) as TileMetadataJson
-  return parseValidTimes(json)
+  const json: unknown = await res.json()
+  if (!validateOpenMeteoValidTimesPayload(json).ok) return []
+  return parseValidTimes(json as TileMetadataJson)
 }
 
 async function fetchValidTimesLength(url: string): Promise<number> {

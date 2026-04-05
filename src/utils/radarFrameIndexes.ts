@@ -136,6 +136,38 @@ export function buildDisplayFrameApiIndices(
 }
 
 /**
+ * Nearest `valid_times` index to `nowMs` across the **entire** timeline (no forward / 12h window).
+ * Used for static map layers and for initial frame selection on the full-model animation.
+ */
+export function singleApiIndexNearestInTimeline(
+  validTimes: string[],
+  nowMs: number = Date.now(),
+): number | null {
+  if (validTimes.length === 0) return null
+  let bestIdx: number | null = null
+  let bestDist = Infinity
+  for (let i = 0; i < validTimes.length; i++) {
+    const d = parseTimelineInstant(validTimes[i] ?? '')
+    if (!d) continue
+    const dist = Math.abs(d.getTime() - nowMs)
+    if (dist < bestDist) {
+      bestDist = dist
+      bestIdx = i
+    }
+  }
+  return bestIdx
+}
+
+/**
+ * Animated radar frames: evenly subsample **full** `valid_times` (index 0 … last), matching the
+ * stable behavior before the 1h/12h “forward from now” window. Does not depend on device clock
+ * beyond optional initial-frame sync.
+ */
+export function buildFullModelDisplayFrameIndices(validTimesLength: number, maxFrames: number): number[] {
+  return buildRadarDisplayFrameIndexes(validTimesLength, maxFrames)
+}
+
+/**
  * Single `valid_times` API index closest to `nowMs` within the forward window
  * (for layers that show one static map frame, no timeline).
  */

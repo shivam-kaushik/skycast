@@ -1,10 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, StyleSheet, PanResponder, type LayoutChangeEvent } from 'react-native'
-import {
-  firstParsedTimelineDate,
-  formatTimelineClock,
-  lastParsedTimelineDate,
-} from '@/src/utils/timelineInstant'
+import { format } from 'date-fns'
+import { firstParsedTimelineDate, lastParsedTimelineDate } from '@/src/utils/timelineInstant'
 import { TEXT_TERTIARY, ACCENT_SOFT, GLASS_BG, GHOST_BORDER } from '@/src/theme/colors'
 import { FONT_MEDIUM } from '@/src/theme/typography'
 
@@ -48,14 +45,17 @@ export default function RadarTimeScrubber({
     lastCommitted.current = safeIndex
   }, [safeIndex])
 
-  const firstClock = useMemo(
-    () => formatTimelineClock(firstParsedTimelineDate(times)),
-    [times],
-  )
-  const lastClock = useMemo(
-    () => formatTimelineClock(lastParsedTimelineDate(times)),
-    [times],
-  )
+  /** Include date — time-only labels made different days look identical (e.g. both "2:00 AM"). */
+  const firstClock = useMemo(() => {
+    const d = firstParsedTimelineDate(times)
+    if (!d) return '—'
+    return format(d, 'EEE M/d h:mm a')
+  }, [times])
+  const lastClock = useMemo(() => {
+    const d = lastParsedTimelineDate(times)
+    if (!d) return '—'
+    return format(d, 'EEE M/d h:mm a')
+  }, [times])
 
   const commitX = useCallback(
     (localX: number) => {
