@@ -110,6 +110,23 @@ export function buildMapHTML(
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@openmeteo/mapbox-layer@0.0.16/dist/index.js"></script>
 <script>
+// Intercept fetch to log all non-ok .om or cloud requests
+(function() {
+  var _orig = window.fetch;
+  window.fetch = function(url, opts) {
+    var urlStr = typeof url === 'string' ? url : (url && url.url) || String(url);
+    var method = (opts && opts.method) || 'GET';
+    var p = _orig.apply(this, arguments);
+    p.then(function(r) {
+      if (!r.ok) {
+        try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nlog', status: r.status, method: method, url: urlStr })); } catch(_) {}
+      }
+    }).catch(function(e) {
+      try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nlog', status: 0, method: method, url: urlStr, err: String(e) })); } catch(_) {}
+    });
+    return p;
+  };
+})();
 (function skycastMapBoot() {
   function reportError(m) {
     try {
@@ -179,7 +196,7 @@ export function buildMapHTML(
   map.createPane('labelPane');
   map.getPane('labelPane').style.zIndex = 300;
   map.createPane('cloudPane');
-  map.getPane('cloudPane').style.zIndex = 400;
+  map.getPane('cloudPane').style.zIndex = 415;
   map.createPane('dataPane');
   map.getPane('dataPane').style.zIndex = 410;
   map.createPane('vectorPane');
@@ -214,7 +231,9 @@ export function buildMapHTML(
     var cloudFrames = [];
     var currentFrame = 0;
     var animTimer = null;
-    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.5 : 0;
+    // Clouds render above precipitation (cloudPane z=415 > dataPane z=410).
+    // 0.50 keeps cloud motion visible while letting the precipitation radar show through.
+    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.50 : 0;
 
     /**
      * Open-Meteo tiles often render into canvas or img nodes. In RN WebView, Leaflet setOpacity alone
@@ -407,80 +426,36 @@ export function buildMapHTML(
       }
     }
 
-    var cloudTileLoadCount = 0;
-    var cloudTileErrorCount = 0;
+    // Animated cloud frames — React passes frameCount/2 precip indices so total WASM tile
+    // layers = (frameCount/2 precip) + (frameCount/2 cloud) = frameCount, same budget as
+    // running without a cloud overlay. 8+8=16 caused OOM; 4+4=8 stays within the heap.
     if (CLOUD_VALID_TIMES_COUNT > 0 && cloudActiveOpacity > 0) {
       for (var j = 0; j < frameIndexes.length; j++) {
         var cloudIdxRaw = (CLOUD_FRAME_INDICES && CLOUD_FRAME_INDICES.length > j) ? CLOUD_FRAME_INDICES[j] : frameIndexes[j];
         var cloudTimeIndex = Math.max(0, Math.min(Math.floor(Number(cloudIdxRaw)), CLOUD_VALID_TIMES_COUNT - 1));
         var omCloudUrl = CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
+        if (j === 0) { try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nlog', status: -1, method: 'INIT', url: 'om://' + omCloudUrl })); } catch(_) {} }
         var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
-          opacity: j === 0 ? cloudActiveOpacity : 0,
+          opacity: j === currentFrame ? cloudActiveOpacity : 0,
           maxNativeZoom: OM_MAX_NATIVE_ZOOM,
           maxZoom: 19,
           zIndex: 9,
           pane: 'cloudPane',
         });
         cloudLayer.addTo(map);
-        try { if (typeof cloudLayer.setZIndex === 'function') cloudLayer.setZIndex(400); } catch (_) {}
-        (function (cl, fj, url) {
+        try { if (typeof cloudLayer.setZIndex === 'function') cloudLayer.setZIndex(415); } catch (_) {}
+        (function (cl, fj) {
           cl.on('tileload', function () {
-            cloudTileLoadCount++;
             setLayerOpacity(cl, fj === currentFrame ? cloudActiveOpacity : 0);
-            if (cloudTileLoadCount === 1) {
-              try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'debug_cloud_tile', event: 'tileload', frameIndex: fj, url: url, totalLoaded: cloudTileLoadCount })); } catch (_) {}
-            }
+            if (fj === 0) { try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'cdbg', ev: 'load', fi: fj })); } catch (_) {} }
           });
           cl.on('tileerror', function (e) {
-            cloudTileErrorCount++;
-            try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'debug_cloud_tile', event: 'tileerror', frameIndex: fj, url: url, error: String(e && e.error ? e.error : 'unknown'), totalErrors: cloudTileErrorCount })); } catch (_) {}
+            try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'cdbg', ev: 'err', fi: fj, msg: String(e && e.error ? e.error : e) })); } catch (_) {}
           });
-        })(cloudLayer, j, omCloudUrl);
+        })(cloudLayer, j);
         cloudFrames.push({ layer: cloudLayer });
       }
     }
-
-    // ── DEBUG: report cloud layer state back to React Native ──
-    try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'debug_cloud',
-        LAYER: LAYER,
-        CLOUD_VALID_TIMES_COUNT: CLOUD_VALID_TIMES_COUNT,
-        cloudActiveOpacity: cloudActiveOpacity,
-        cloudFramesCreated: cloudFrames.length,
-        CLOUD_SOURCE_URL: CLOUD_SOURCE_URL,
-        CLOUD_FRAME_INDICES: CLOUD_FRAME_INDICES,
-        FRAME_INDICES: FRAME_INDICES,
-      }));
-    } catch (_) {}
-
-    // ── DEBUG: compare raw metadata JSON for precip vs cloud ──
-    function debugFetchMeta(label, url) {
-      fetch(url)
-        .then(function(r) {
-          return r.json().then(function(j) {
-            try {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'debug_meta_fetch',
-                label: label,
-                status: r.status,
-                topLevelKeys: Object.keys(j || {}),
-                hasUrl: 'url' in j,
-                urlValue: typeof j.url === 'string' ? j.url.slice(0, 120) : null,
-                hasTiles: 'tiles' in j,
-                validTimesCount: Array.isArray(j.valid_times) ? j.valid_times.length : 0,
-              }));
-            } catch (_) {}
-          });
-        })
-        .catch(function(e) {
-          try {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'debug_meta_fetch', label: label, error: String(e) }));
-          } catch (_) {}
-        });
-    }
-    debugFetchMeta('precipitation', TILE_SOURCE_URL + '&time_step=valid_times_0');
-    debugFetchMeta('cloud_cover',   CLOUD_SOURCE_URL + '&time_step=valid_times_0');
 
     showFrame(currentFrame);
     startAnimation();
@@ -704,7 +679,13 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       if (one !== null) return finalize([one])
       return finalize([0])
     }
-    return finalize(buildFullModelDisplayFrameIndices(tl, MAX_MAP_FRAMES))
+    // Precipitation shares the WASM heap with a matching set of cloud frames.
+    // 8 precip + 8 cloud = 16 layers → OOM. Use 4+4 = 8 total, within budget.
+    const frameCount =
+      layer === 'precipitation' && tileMeta.cloudValidTimesLength > 0
+        ? Math.floor(MAX_MAP_FRAMES / 2)
+        : MAX_MAP_FRAMES
+    return finalize(buildFullModelDisplayFrameIndices(tl, frameCount))
   })()
   const frameTimeLabels = displayIndexes.map((i) => tileMeta.validTimes[i] ?? '')
   const initialFrameIndex = useStaticSingleFrame ? 0 : indexOfFrameNearestToNow(frameTimeLabels, nowMs)
@@ -717,15 +698,6 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     tileMeta.tileSourceUrl,
     tileMeta.cloudSourceUrl,
   )
-
-  // ── DEBUG: log cloud metadata so we can verify data is arriving ──
-  console.log('[WeatherMapView] layer:', layer)
-  console.log('[WeatherMapView] tileValidTimesLength:', tileMeta.tileValidTimesLength)
-  console.log('[WeatherMapView] cloudValidTimesLength:', tileMeta.cloudValidTimesLength)
-  console.log('[WeatherMapView] cloudValidTimes.length:', (tileMeta.cloudValidTimes ?? []).length)
-  console.log('[WeatherMapView] cloudSourceUrl:', tileMeta.cloudSourceUrl)
-  console.log('[WeatherMapView] displayIndexes:', displayIndexes)
-  console.log('[WeatherMapView] cloudFrameIndices:', cloudFrameIndices)
 
   const html = buildMapHTML(lat, lon, layer, overlay, {
     ...tileMeta,
@@ -790,17 +762,13 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
             if (msg.type === 'timeline' && Array.isArray(msg.times)) {
               onTimelineReady?.(msg.times)
             }
-            if (msg.type === 'debug_cloud') {
-              console.log('[WebView] debug_cloud:', JSON.stringify(msg, null, 2))
+            if (msg.type === 'cdbg') {
+              console.log('[cloud]', JSON.stringify(msg))
             }
-            if (msg.type === 'debug_cloud_tile') {
-              console.log('[WebView] debug_cloud_tile:', JSON.stringify(msg, null, 2))
-            }
-            if (msg.type === 'debug_meta_fetch') {
-              console.log('[WebView] debug_meta_fetch:', JSON.stringify(msg, null, 2))
+            if (msg.type === 'nlog') {
+              console.log('[net404]', JSON.stringify(msg))
             }
             if (msg.type === 'error') {
-              console.log('[WebView] error:', (msg as { msg?: string }).msg)
               setMapLoading(false)
               setMapError(true)
               onFrameUpdate(0, 0, null)
