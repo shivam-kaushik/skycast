@@ -238,9 +238,13 @@ export default function MoreScreen() {
                     style={[styles.bentoLine, !isLast && styles.bentoLineBorder]}
                   >
                     <View style={styles.bentoIconGold}>
-                      <Ionicons name={activity.icon} size={18} color={ACCENT} />
+                      <Ionicons name={activity.icon} size={15} color={ACCENT} />
                     </View>
-                    <Text style={styles.bentoName}>{activity.name}</Text>
+                    <View style={styles.bentoTextWrap}>
+                      <Text style={styles.bentoName} numberOfLines={1}>
+                        {activity.name}
+                      </Text>
+                    </View>
                     <Text style={styles.bentoScoreGold}>{score.score.toFixed(1)}</Text>
                   </View>
                 )
@@ -256,9 +260,13 @@ export default function MoreScreen() {
                     style={[styles.bentoLine, !isLast && styles.bentoLineBorder]}
                   >
                     <View style={styles.bentoIconBlue}>
-                      <Ionicons name={activity.icon} size={18} color={SECONDARY} />
+                      <Ionicons name={activity.icon} size={15} color={SECONDARY} />
                     </View>
-                    <Text style={styles.bentoName}>{activity.name}</Text>
+                    <View style={styles.bentoTextWrap}>
+                      <Text style={styles.bentoName} numberOfLines={1}>
+                        {activity.name}
+                      </Text>
+                    </View>
                     <Text style={styles.bentoScoreBlue}>{score.score.toFixed(1)}</Text>
                   </View>
                 )
@@ -443,49 +451,59 @@ const styles = StyleSheet.create({
   bentoCol: {
     flex: 1,
     minWidth: 150,
-    padding: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
   },
   bentoLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
+    gap: 4,
+    paddingVertical: 10,
   },
   bentoLineBorder: {
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   bentoIconGold: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(255, 193, 7, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bentoIconBlue: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(59, 147, 243, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bentoName: {
-    flex: 1,
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '500',
     color: TEXT_PRIMARY,
+    flexShrink: 1,
+  },
+  bentoTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 6,
   },
   bentoScoreGold: {
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: '700',
     color: ACCENT,
+    width: 26,
+    textAlign: 'right',
   },
   bentoScoreBlue: {
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: '700',
     color: SECONDARY,
+    width: 26,
+    textAlign: 'right',
   },
   spacer: {
     height: 20,
