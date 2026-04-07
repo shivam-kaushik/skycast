@@ -62,6 +62,17 @@ export function buildMapHTML(
     cloudFrameIndices: number[]
     /** Start animation on the frame whose valid time is nearest to load time (usually “now”). */
     initialFrameIndex: number
+    /**
+     * Pre-resolved `.om` tile file URLs (one per animation frame). When provided these are passed
+     * directly to `createTileLayer` instead of `tileSourceUrl + &time_step=valid_times_N`, which
+     * prevents the library from embedding z/x/y coords into the time_step query param and generating
+     * NaN tile coordinates.
+     */
+    tileOmUrls?: string[]
+    /** Pre-resolved `.om` tile file URLs for the cloud overlay (one per animation frame). */
+    cloudOmUrls?: string[]
+    /** Pre-resolved `.om` tile file URLs for wind vector overlay (one per animation frame). */
+    windOmUrls?: string[]
   },
   /** ISO time for each animation frame (same length as subsampled frames in the map) */
   frameTimeLabels: string[],
@@ -172,6 +183,10 @@ export function buildMapHTML(
   var CLOUD_FRAME_INDICES = ${JSON.stringify(params.cloudFrameIndices)};
   var FRAME_TIME_LABELS = ${JSON.stringify(frameTimeLabels)};
   var INITIAL_FRAME_INDEX = ${params.initialFrameIndex};
+  // Pre-resolved .om tile file URLs — avoids the time_step+tile-coord NaN bug in the OM library.
+  var TILE_OM_URLS = ${JSON.stringify(params.tileOmUrls ?? [])};
+  var CLOUD_OM_URLS = ${JSON.stringify(params.cloudOmUrls ?? [])};
+  var WIND_OM_URLS = ${JSON.stringify(params.windOmUrls ?? [])};
 
   // Register om:// before map init (Open-Meteo adapter expects this order)
   var omMod = window.OpenMeteoMapboxLayer || window.OMWeatherMapLayer;
@@ -354,7 +369,9 @@ export function buildMapHTML(
     for (var i = 0; i < frameIndexes.length; i++) {
       var rawTi = frameIndexes[i];
       var timeIndex = Math.max(0, Math.min(Math.floor(Number(rawTi)), TILE_VALID_TIMES_COUNT - 1));
-      var omUrl = TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
+      var omUrl = (TILE_OM_URLS && TILE_OM_URLS.length > i && TILE_OM_URLS[i])
+        ? TILE_OM_URLS[i]
+        : TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
       var tileLayer = adapter.createTileLayer('om://' + omUrl, {
         opacity:
           i === 0
@@ -386,7 +403,9 @@ export function buildMapHTML(
     if (LAYER === 'wind' && WIND_VECTOR_SOURCE_URL && WIND_VECTOR_VALID_TIMES_COUNT > 0) {
       for (var k = 0; k < frameIndexes.length; k++) {
         var vectorTimeIndex = Math.max(0, Math.min(Math.floor(Number(frameIndexes[k])), WIND_VECTOR_VALID_TIMES_COUNT - 1));
-        var vecOmUrl = WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
+        var vecOmUrl = (WIND_OM_URLS && WIND_OM_URLS.length > k && WIND_OM_URLS[k])
+          ? WIND_OM_URLS[k]
+          : WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
         var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, {
           opacity: k === 0 ? 0.88 : 0,
           maxNativeZoom: OM_MAX_NATIVE_ZOOM,
@@ -433,8 +452,9 @@ export function buildMapHTML(
       for (var j = 0; j < frameIndexes.length; j++) {
         var cloudIdxRaw = (CLOUD_FRAME_INDICES && CLOUD_FRAME_INDICES.length > j) ? CLOUD_FRAME_INDICES[j] : frameIndexes[j];
         var cloudTimeIndex = Math.max(0, Math.min(Math.floor(Number(cloudIdxRaw)), CLOUD_VALID_TIMES_COUNT - 1));
-        var omCloudUrl = CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
-        if (j === 0) { try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nlog', status: -1, method: 'INIT', url: 'om://' + omCloudUrl })); } catch(_) {} }
+        var omCloudUrl = (CLOUD_OM_URLS && CLOUD_OM_URLS.length > j && CLOUD_OM_URLS[j])
+          ? CLOUD_OM_URLS[j]
+          : CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
         var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
           opacity: j === currentFrame ? cloudActiveOpacity : 0,
           maxNativeZoom: OM_MAX_NATIVE_ZOOM,
@@ -583,6 +603,34 @@ export function buildMapHTML(
 
 /** Precipitation uses the same Open-Meteo map tiles as other layers (see `buildMapHTML`). */
 
+/**
+ * Convert a `latest.json?variable=X` metadata URL + run/valid times into the direct `.om` tile
+ * data file URL. Passing this to `createTileLayer` instead of the `latest.json?time_step=N` form
+ * avoids a bug in @openmeteo/mapbox-layer ≤0.0.16 where Leaflet z/x/y tile coords get embedded
+ * into the `time_step` query param value, making `Number("N/z/x/y") = NaN` and producing
+ * `NaN-aN-aNTaN00.om` tile paths that always 404.
+ */
+function buildOmFileUrl(
+  metadataUrl: string,
+  referenceTimeIso: string,
+  validTimeIso: string,
+): string {
+  const pad2 = (n: number): string => ('0' + n).slice(-2)
+  const P = new Date(referenceTimeIso)
+  const A = new Date(validTimeIso)
+  if (!Number.isFinite(P.getTime()) || !Number.isFinite(A.getTime())) return ''
+  const run = `${P.getUTCFullYear()}/${pad2(P.getUTCMonth() + 1)}/${pad2(P.getUTCDate())}/${pad2(P.getUTCHours())}00Z`
+  const valid = `${A.getUTCFullYear()}-${pad2(A.getUTCMonth() + 1)}-${pad2(A.getUTCDate())}T${pad2(A.getUTCHours())}00.om`
+  const qIdx = metadataUrl.indexOf('?')
+  const base = qIdx >= 0 ? metadataUrl.slice(0, qIdx) : metadataUrl
+  const query = qIdx >= 0 ? metadataUrl.slice(qIdx + 1) : ''
+  const params = new URLSearchParams(query)
+  params.delete('time_step')
+  const queryStr = params.toString()
+  const resolvedBase = base.replace('latest.json', `${run}/${valid}`)
+  return queryStr ? `${resolvedBase}?${queryStr}` : resolvedBase
+}
+
 const MAX_MAP_FRAMES = 8
 
 function injectSeekScript(index: number): string {
@@ -699,11 +747,35 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
     tileMeta.cloudSourceUrl,
   )
 
+  // Pre-resolve .om tile file URLs for each frame to work around OM library bug (≤0.0.16):
+  // Leaflet embeds z/x/y coords into the time_step query param → Number("N/z/x/y") = NaN.
+  const tileOmUrls = displayIndexes.map((i) =>
+    buildOmFileUrl(tileMeta.tileSourceUrl, tileMeta.referenceTime, tileMeta.validTimes[i] ?? ''),
+  ).filter(Boolean) as string[]
+
+  const cloudOmUrls = cloudFrameIndices.map((i) => {
+    const cloudTime = (tileMeta.cloudValidTimes ?? [])[i] ?? tileMeta.validTimes[i] ?? ''
+    return buildOmFileUrl(tileMeta.cloudSourceUrl, tileMeta.cloudReferenceTime, cloudTime)
+  }).filter(Boolean) as string[]
+
+  const windOmUrls = (layer === 'wind' && tileMeta.windVectorSourceUrl)
+    ? displayIndexes.map((i) =>
+        buildOmFileUrl(
+          tileMeta.windVectorSourceUrl!,
+          tileMeta.referenceTime,
+          tileMeta.validTimes[i] ?? '',
+        ),
+      ).filter(Boolean) as string[]
+    : []
+
   const html = buildMapHTML(lat, lon, layer, overlay, {
     ...tileMeta,
     frameIndices: displayIndexes,
     cloudFrameIndices,
     initialFrameIndex,
+    tileOmUrls: tileOmUrls.length === displayIndexes.length ? tileOmUrls : undefined,
+    cloudOmUrls: cloudOmUrls.length === cloudFrameIndices.length ? cloudOmUrls : undefined,
+    windOmUrls: windOmUrls.length > 0 ? windOmUrls : undefined,
   }, frameTimeLabels)
 
   // baseUrl must be a real HTTPS origin so Android WebView allows CDN requests
