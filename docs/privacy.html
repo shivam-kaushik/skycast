@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skycast — Privacy Policy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0A0F1E;
+      color: #ffffff;
+      line-height: 1.7;
+      padding: 0 16px 80px;
+    }
+
+    .hero {
+      background: linear-gradient(160deg, #1a2340 0%, #0A0F1E 60%);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 60px 24px 48px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+
+    .hero p {
+      margin-top: 8px;
+      color: rgba(255,255,255,0.5);
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 20px;
+      background: rgba(6, 214, 160, 0.15);
+      border: 1px solid rgba(6, 214, 160, 0.35);
+      color: #06D6A0;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding-top: 48px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 20px;
+      padding: 28px 32px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 14px;
+    }
+
+    .card p {
+      color: rgba(255,255,255,0.75);
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+
+    .card p:last-child { margin-bottom: 0; }
+
+    .card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .card ul li {
+      color: rgba(255,255,255,0.75);
+      font-size: 15px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .card ul li:last-child { border-bottom: none; }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4A9EFF;
+      flex-shrink: 0;
+      margin-top: 8px;
+    }
+
+    .dot.green { background: #06D6A0; }
+    .dot.amber { background: #FFD166; }
+
+    .highlight-box {
+      background: rgba(74, 158, 255, 0.08);
+      border: 1px solid rgba(74, 158, 255, 0.20);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-top: 16px;
+    }
+
+    .highlight-box p {
+      color: rgba(255,255,255,0.80) !important;
+      font-size: 14px !important;
+      margin: 0 !important;
+    }
+
+    .apis {
+      display: grid;
+      gap: 12px;
+    }
+
+    .api-item {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 14px 18px;
+    }
+
+    .api-item strong {
+      display: block;
+      font-size: 14px;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .api-item span {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+    }
+
+    .contact-link {
+      color: #4A9EFF;
+      text-decoration: none;
+    }
+
+    .contact-link:hover { text-decoration: underline; }
+
+    .footer {
+      text-align: center;
+      margin-top: 48px;
+      color: rgba(255,255,255,0.25);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">⛅</div>
+  <h1>Skycast Privacy Policy</h1>
+  <p>Last updated: April 8, 2026</p>
+  <span class="badge">No tracking. No ads. No accounts.</span>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Overview</h2>
+    <p>Skycast is a free, ad-free weather app. We believe great software doesn't need to harvest your data. This policy explains exactly what information is used — and what isn't.</p>
+    <div class="highlight-box">
+      <p>Skycast does <strong>not</strong> collect, store, sell, or share any personal information. All data stays on your device.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Location Data</h2>
+    <p>Skycast requests access to your device's location for one purpose: fetching accurate local weather.</p>
+    <ul>
+      <li><span class="dot"></span><span>Your GPS coordinates (latitude &amp; longitude) are sent directly to Open-Meteo weather APIs to retrieve weather, air quality, and map data for your area.</span></li>
+      <li><span class="dot"></span><span>Location data is <strong>never</strong> stored on any server — it is only used in the moment of the API request.</span></li>
+      <li><span class="dot"></span><span>Your coordinates are stored locally on your device only (to remember your last location between sessions).</span></li>
+      <li><span class="dot green"></span><span>You can deny location permission. The app lets you manually search for and select any city instead.</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Data We Store On Your Device</h2>
+    <p>The following is stored <strong>locally on your device only</strong> using standard device storage (AsyncStorage). None of it leaves your phone.</p>
+    <ul>
+      <li><span class="dot"></span><span>Last known location (latitude, longitude, city name)</span></li>
+      <li><span class="dot"></span><span>Saved and favourite locations (up to 10 recent)</span></li>
+      <li><span class="dot"></span><span>Temperature unit preference (°C or °F)</span></li>
+      <li><span class="dot"></span><span>Weather alert threshold settings (rain %, UV index, wind speed)</span></li>
+      <li><span class="dot"></span><span>User routine times (morning, commute, evening — used for smart notification timing)</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>External APIs Used</h2>
+    <p>Skycast uses only free, open-source weather APIs. No API keys or accounts are required. Your device contacts these services directly:</p>
+    <div class="apis">
+      <div class="api-item">
+        <strong>Open-Meteo Weather API</strong>
+        <span>api.open-meteo.com — current weather, hourly &amp; 14-day forecast</span>
+      </div>
+      <div class="api-item">
+        <strong>Open-Meteo Air Quality API</strong>
+        <span>air-quality-api.open-meteo.com — AQI, pollutants, and pollen levels</span>
+      </div>
+      <div class="api-item">
+        <strong>Open-Meteo Historical API (ERA5)</strong>
+        <span>archive-api.open-meteo.com — last 7 days of historical weather</span>
+      </div>
+      <div class="api-item">
+        <strong>Open-Meteo Map Tiles</strong>
+        <span>map-tiles.open-meteo.com — radar, precipitation, temperature, and wind map layers</span>
+      </div>
+      <div class="api-item">
+        <strong>Open-Meteo Geocoding API</strong>
+        <span>geocoding-api.open-meteo.com — city name search (with Komoot Photon as fallback)</span>
+      </div>
+    </div>
+    <div class="highlight-box" style="margin-top:16px;">
+      <p>All APIs receive only your coordinates and timezone — no device identifiers, no personal information. Open-Meteo's own privacy policy is available at <a href="https://open-meteo.com" class="contact-link">open-meteo.com</a>.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What We Don't Do</h2>
+    <ul>
+      <li><span class="dot green"></span><span>No user accounts or registration</span></li>
+      <li><span class="dot green"></span><span>No analytics or usage tracking (no Firebase, Amplitude, Segment, or similar)</span></li>
+      <li><span class="dot green"></span><span>No advertising or ad networks</span></li>
+      <li><span class="dot green"></span><span>No crash reporting services that send data externally</span></li>
+      <li><span class="dot green"></span><span>No third-party SDKs that track behaviour</span></li>
+      <li><span class="dot green"></span><span>No sale or sharing of any data with third parties</span></li>
+      <li><span class="dot green"></span><span>No background location tracking</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Permissions</h2>
+    <ul>
+      <li><span class="dot amber"></span><span><strong>Location (Foreground only)</strong> — Used to get your current GPS position for weather lookup. Never tracked in the background.</span></li>
+      <li><span class="dot amber"></span><span><strong>Notifications (Optional)</strong> — Used only to deliver weather alerts you explicitly enable in Settings (e.g. rain, UV, or wind warnings). You control which alerts are on.</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Children's Privacy</h2>
+    <p>Skycast does not collect any personal information from anyone, including children under 13. The app is suitable for all ages.</p>
+  </div>
+
+  <div class="card">
+    <h2>Changes to This Policy</h2>
+    <p>If this policy changes in a meaningful way, we will update the date at the top of this page. Continued use of the app after changes constitutes acceptance of the updated policy.</p>
+  </div>
+
+  <div class="card">
+    <h2>Contact</h2>
+    <p>Questions about this privacy policy? Reach out via the app's GitHub repository or contact the developer directly.</p>
+  </div>
+
+  <div class="footer">
+    <p>Skycast &copy; 2026 &mdash; Built with Open-Meteo. Free forever.</p>
+  </div>
+
+</div>
+</body>
+</html>
