@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-interface AlertsEnabled {
+export interface AlertsEnabled {
   rain: boolean
   uv: boolean
   wind: boolean

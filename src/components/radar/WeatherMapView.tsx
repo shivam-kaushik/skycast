@@ -727,10 +727,12 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       if (one !== null) return finalize([one])
       return finalize([0])
     }
-    // Precipitation shares the WASM heap with a matching set of cloud frames.
-    // 8 precip + 8 cloud = 16 layers → OOM. Use 4+4 = 8 total, within budget.
+    // Cloud overlay uses the same WASM heap as the primary animated layer.
+    // If clouds are available, keeping full frame count for both doubles tile layers
+    // and can trip WebView OOM (observed as RuntimeError: Aborted(OOM)).
+    // Budget total animated layers to MAX_MAP_FRAMES by splitting frame count in half.
     const frameCount =
-      layer === 'precipitation' && tileMeta.cloudValidTimesLength > 0
+      tileMeta.cloudValidTimesLength > 0
         ? Math.floor(MAX_MAP_FRAMES / 2)
         : MAX_MAP_FRAMES
     return finalize(buildFullModelDisplayFrameIndices(tl, frameCount))

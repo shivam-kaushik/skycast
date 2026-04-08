@@ -23,6 +23,7 @@ import GlassCard from '@/src/components/shared/GlassCard'
 import SectionLabel from '@/src/components/shared/SectionLabel'
 import HistoryBriefCard from '@/src/components/more/HistoryBriefCard'
 import ActivityWeekOutlook from '@/src/components/more/ActivityWeekOutlook'
+import AIFeaturesCard from '@/src/components/more/AIFeaturesCard'
 import {
   scoreRunning,
   scoreCycling,
@@ -43,6 +44,14 @@ import {
 } from '@/src/utils/healthInsights'
 import { describeAQI, describeUV } from '@/src/utils/weatherDescriptions'
 import type { ActivityScore } from '@/src/types/weather'
+import { useAICoachStore } from '@/src/store/aiCoachStore'
+import {
+  buildActivityWindowInsights,
+  buildPhase2Insights,
+  buildPhase3Insights,
+  buildSmartNotifications,
+  buildTomorrowHeadsUp,
+} from '@/src/utils/aiInsights'
 import {
   BG,
   TEXT_PRIMARY,
@@ -111,6 +120,7 @@ export default function MoreScreen() {
   const windThreshold = usePrefsStore((s) => s.windThreshold)
   const alertsEnabled = usePrefsStore((s) => s.alertsEnabled)
   const toggleAlert = usePrefsStore((s) => s.toggleAlert)
+  const routine = useAICoachStore((s) => s.routine)
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -170,6 +180,37 @@ export default function MoreScreen() {
 
   const colA = ACTIVITIES.slice(0, 5)
   const colB = ACTIVITIES.slice(5, 10)
+
+  const aiInputs = useMemo(() => {
+    if (!weather) return null
+    return {
+      hourly: weather.hourly,
+      daily: weather.daily,
+      airQuality: airQuality ?? undefined,
+      alertsEnabled,
+      thresholds: {
+        rain: rainThreshold,
+        uv: uvThreshold,
+        wind: windThreshold,
+      },
+      routine,
+      now: new Date(),
+    }
+  }, [weather, airQuality, alertsEnabled, rainThreshold, uvThreshold, windThreshold, routine])
+
+  const phase1Insights = useMemo(() => {
+    if (!aiInputs) return []
+    const windows = buildActivityWindowInsights(aiInputs)
+    const tomorrow = buildTomorrowHeadsUp(aiInputs)
+    return tomorrow ? [...windows, tomorrow] : windows
+  }, [aiInputs])
+
+  const smartNotifications = useMemo(
+    () => (aiInputs ? buildSmartNotifications(aiInputs) : []),
+    [aiInputs],
+  )
+  const phase2Insights = useMemo(() => (aiInputs ? buildPhase2Insights(aiInputs) : []), [aiInputs])
+  const phase3Insights = useMemo(() => (aiInputs ? buildPhase3Insights(aiInputs) : []), [aiInputs])
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -296,6 +337,40 @@ export default function MoreScreen() {
           errorMessage={era5ErrorMessage}
           brief={historyBrief}
         />
+
+        <View style={styles.spacer} />
+
+        <SectionLabel text="AI weather intelligence" accent />
+        {weatherLoading || !weather ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={styles.loadingText}>Preparing AI insights…</Text>
+          </View>
+        ) : (
+          <AIFeaturesCard
+            phase1={phase1Insights}
+            phase2={phase2Insights}
+            phase3={phase3Insights}
+            notifications={smartNotifications}
+          />
+        )}
+
+        <View style={styles.spacer} />
+
+        <SectionLabel text="AI weather intelligence" accent />
+        {weatherLoading || !weather ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={styles.loadingText}>Preparing AI insights…</Text>
+          </View>
+        ) : (
+          <AIFeaturesCard
+            phase1={phase1Insights}
+            phase2={phase2Insights}
+            phase3={phase3Insights}
+            notifications={smartNotifications}
+          />
+        )}
 
         <View style={styles.spacer} />
 
