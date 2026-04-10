@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:map-tiles.open-meteo.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "WebFetch(domain:open-meteo.com)",
+      "WebFetch(domain:api.rainviewer.com)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist:*)",
+      "Bash(taskkill:*)",
+      "Bash(eas whoami:*)",
+      "Bash(npx eas:*)"
+    ]
+  }
+}

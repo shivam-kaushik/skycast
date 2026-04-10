@@ -16,16 +16,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shivamkaushik.skycast",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Skycast uses your location to show accurate local weather, air quality, and forecasts.",
         "NSLocationAlwaysUsageDescription": "Skycast uses your location to show accurate local weather, air quality, and forecasts.",
-        "UIBackgroundModes": []
+        "UIBackgroundModes": [],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.shivamkaushik.skycast",
-      "versionCode": 1,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A0F1E"
@@ -36,7 +37,9 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -65,7 +68,12 @@
       "typedRoutes": true
     },
     "extra": {
-      "privacyPolicyUrl": "https://shivam-kaushik.github.io/skycast/privacy"
-    }
+      "privacyPolicyUrl": "https://shivam-kaushik.github.io/skycast/privacy",
+      "router": {},
+      "eas": {
+        "projectId": "180e8095-a24f-432d-9ec4-647ef63115fc"
+      }
+    },
+    "owner": "shivamkaushik2205"
   }
 }
