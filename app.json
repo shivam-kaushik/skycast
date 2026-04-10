@@ -14,9 +14,9 @@
       "backgroundColor": "#0A0F1E"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.shivamkaushik.skycast",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Skycast uses your location to show accurate local weather, air quality, and forecasts.",
         "NSLocationAlwaysUsageDescription": "Skycast uses your location to show accurate local weather, air quality, and forecasts.",
