@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "com.shivamkaushik.skycast",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A0F1E"
