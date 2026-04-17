@@ -6,7 +6,7 @@ describe('RadarTimeScrubber', () => {
   it('renders distinct start/end labels with date when span crosses days', () => {
     const times = ['2026-04-02T06:00:00.000Z', '2026-04-04T06:00:00.000Z']
     const tr = TestRenderer.create(
-      <RadarTimeScrubber times={times} selectedIndex={0} onSelectIndex={() => {}} />,
+      <RadarTimeScrubber times={times} selectedIndex={0} isPlaying={false} onSelectIndex={() => {}} />,
     )
     const texts = tr.root
       .findAllByType('Text' as React.ElementType)

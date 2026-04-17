@@ -7,7 +7,7 @@ import { useOmeteoMapTileMetadata } from '@/src/hooks/useOmeteoMapTileMetadata'
 import { type MapLayer } from '@/src/components/radar/mapLayerConfig'
 import {
   buildCloudFrameIndicesForAnimation,
-  buildFullModelDisplayFrameIndices,
+  buildDisplayFrameApiIndices,
   buildRadarDisplayFrameIndexes,
   indexOfFrameNearestToNow,
   sanitizeOmFrameIndices,
@@ -93,6 +93,14 @@ export function buildMapHTML(
     .leaflet-control-zoom { display: none !important; }
     .leaflet-control-attribution { display: none !important; }
     .leaflet-bar { display: none !important; }
+    /*
+     * Smooth crossfade between animation frames — each weather/cloud layer fades in/out
+     * rather than snapping. 500ms crossfade inside a 1200ms frame interval means frames
+     * are fully visible for ~700ms before the next blend begins (cinema-style dissolve).
+     */
+    .leaflet-layer {
+      transition: opacity 500ms ease-in-out;
+    }
     .pulse-ring {
       width: 20px; height: 20px;
       border-radius: 50%;
@@ -133,6 +141,8 @@ export function buildMapHTML(
         try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nlog', status: r.status, method: method, url: urlStr })); } catch(_) {}
       }
     }).catch(function(e) {
+      // AbortError = Leaflet cancelled the request (tile out of viewport / layer hidden) — not a real failure
+      if (String(e).indexOf('AbortError') >= 0) return;
       try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'nlog', status: 0, method: method, url: urlStr, err: String(e) })); } catch(_) {}
     });
     return p;
@@ -246,9 +256,14 @@ export function buildMapHTML(
     var cloudFrames = [];
     var currentFrame = 0;
     var animTimer = null;
-    // Clouds render above precipitation (cloudPane z=415 > dataPane z=410).
-    // 0.50 keeps cloud motion visible while letting the precipitation radar show through.
-    var cloudActiveOpacity = LAYER === 'precipitation' ? 0.50 : 0;
+    // Preload tracking: count tiles loaded per frame so we can defer animation start
+    // until the initial frame has rendered. tilesLoaded[i] = count of tiles loaded for frame i.
+    var animationStarted = false;
+    // Cloud WASM overlay is disabled: the @openmeteo/mapbox-layer WASM heap is global and
+    // non-reclaimable. Even 4 radar frames fill the heap; any cloud tile triggers OOM which
+    // aborts the entire WASM runtime — killing radar animation too. Cloud is disabled until
+    // a non-WASM (PNG tile) cloud source is available.
+    var cloudActiveOpacity = 0;
 
     /**
      * Open-Meteo tiles often render into canvas or img nodes. In RN WebView, Leaflet setOpacity alone
@@ -289,22 +304,24 @@ export function buildMapHTML(
     }
 
     function showFrame(idx) {
-      for (var i = 0; i < radarFrames.length; i++) {
-        var activeOpacity =
-          LAYER === 'wind' ? 0.56 : LAYER === 'temperature' ? 0.86 : LAYER === 'precipitation' ? 0.82 : 0.66;
-        setLayerOpacity(radarFrames[i].layer, i === idx ? activeOpacity : 0);
+      var activeOpacity =
+        LAYER === 'wind' ? 0.56 : LAYER === 'temperature' ? 0.86 : LAYER === 'precipitation' ? 0.82 : 0.66;
+      for (var i = 0; i < frameCount; i++) {
+        if (radarFrames[i]) setLayerOpacity(radarFrames[i].layer, i === idx ? activeOpacity : 0);
+        if (windVectorFrames[i]) setLayerOpacity(windVectorFrames[i].layer, i === idx ? 0.9 : 0);
       }
-      for (var v = 0; v < windVectorFrames.length; v++) {
-        setLayerOpacity(windVectorFrames[v].layer, v === idx ? 0.9 : 0);
-      }
-      for (var j = 0; j < cloudFrames.length; j++) {
-        setLayerOpacity(cloudFrames[j].layer, j === idx ? cloudActiveOpacity : 0);
-      }
+      // Cloud on-demand pool: show active frame's cloud, hide others.
+      // loadNextCloud is defined below — var-hoisted so safe to call here.
+      Object.keys(cloudPool).forEach(function(key) {
+        var k = parseInt(key);
+        setLayerOpacity(cloudPool[k].layer, k === idx ? cloudActiveOpacity : 0);
+      });
+      if (CLOUD_VALID_TIMES_COUNT > 0 && cloudActiveOpacity > 0) loadNextCloud(idx);
       try {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'frame',
           current: idx,
-          total: radarFrames.length,
+          total: frameCount,
           timeISO: FRAME_TIME_LABELS[idx] || null
         }));
       } catch(e) {}
@@ -313,10 +330,10 @@ export function buildMapHTML(
     function startAnimation() {
       if (animTimer) clearInterval(animTimer);
       animTimer = setInterval(function() {
-        if (!isPlaying || radarFrames.length === 0) return;
-        currentFrame = (currentFrame + 1) % radarFrames.length;
+        if (!isPlaying || frameCount === 0) return;
+        currentFrame = (currentFrame + 1) % frameCount;
         showFrame(currentFrame);
-      }, 650);
+      }, 1200);
     }
 
     function buildFrameIndexes(totalCount, frameCount) {
@@ -366,123 +383,156 @@ export function buildMapHTML(
     if (startIdx < 0 || startIdx >= frameCount) startIdx = 0;
     currentFrame = startIdx;
 
-    for (var i = 0; i < frameIndexes.length; i++) {
-      var rawTi = frameIndexes[i];
-      var timeIndex = Math.max(0, Math.min(Math.floor(Number(rawTi)), TILE_VALID_TIMES_COUNT - 1));
-      var omUrl = (TILE_OM_URLS && TILE_OM_URLS.length > i && TILE_OM_URLS[i])
-        ? TILE_OM_URLS[i]
-        : TILE_SOURCE_URL + '&time_step=valid_times_' + timeIndex;
-      var tileLayer = adapter.createTileLayer('om://' + omUrl, {
-        opacity:
-          i === 0
-            ? LAYER === 'wind'
-              ? 0.56
-              : LAYER === 'temperature'
-                ? 0.86
-                : LAYER === 'precipitation'
-                  ? 0.82
-                  : 0.66
-            : 0,
-        maxNativeZoom: OM_MAX_NATIVE_ZOOM,
-        maxZoom: 19,
-        zIndex: 10,
-        pane: 'dataPane',
-      });
-      tileLayer.addTo(map);
-      try { if (typeof tileLayer.setZIndex === 'function') tileLayer.setZIndex(410); } catch (_) {}
-      (function (tl, fi) {
-        tl.on('tileload', function () {
-          var activeOp =
-            LAYER === 'wind' ? 0.56 : LAYER === 'temperature' ? 0.86 : LAYER === 'precipitation' ? 0.82 : 0.66;
-          setLayerOpacity(tl, fi === currentFrame ? activeOp : 0);
-        });
-      })(tileLayer, i);
-      radarFrames.push({ layer: tileLayer });
+    // ── Serial radar queue ────────────────────────────────────────────────────
+    // Load radar (and wind vector) frames one at a time to avoid concurrent WASM
+    // decompression. Cloud is handled by the on-demand pool below — old cloud frames
+    // are evicted from the map (releasing WASM heap) so only 2 cloud layers are ever
+    // resident at once: 4 radar + 2 cloud = 6 total, safely under the OOM limit.
+    var loadQueue = [];
+    for (var qi = 0; qi < frameIndexes.length; qi++) {
+      loadQueue.push({ kind: 'radar', idx: qi });
+      if (LAYER === 'wind' && WIND_VECTOR_SOURCE_URL && WIND_VECTOR_VALID_TIMES_COUNT > 0) {
+        loadQueue.push({ kind: 'wind', idx: qi });
+      }
     }
-
-    if (LAYER === 'wind' && WIND_VECTOR_SOURCE_URL && WIND_VECTOR_VALID_TIMES_COUNT > 0) {
-      for (var k = 0; k < frameIndexes.length; k++) {
-        var vectorTimeIndex = Math.max(0, Math.min(Math.floor(Number(frameIndexes[k])), WIND_VECTOR_VALID_TIMES_COUNT - 1));
-        var vecOmUrl = (WIND_OM_URLS && WIND_OM_URLS.length > k && WIND_OM_URLS[k])
-          ? WIND_OM_URLS[k]
-          : WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + vectorTimeIndex;
-        var vectorLayer = adapter.createVectorTileLayer('om://' + vecOmUrl, {
-          opacity: k === 0 ? 0.88 : 0,
-          maxNativeZoom: OM_MAX_NATIVE_ZOOM,
-          maxZoom: 19,
-          zIndex: 11,
-          pane: 'vectorPane',
+    var qPos = 0;
+    function nextLoad() {
+      if (qPos >= loadQueue.length) return;
+      var qItem = loadQueue[qPos++];
+      var qRawTi = frameIndexes[qItem.idx];
+      var qLayer;
+      if (qItem.kind === 'radar') {
+        var qTi = Math.max(0, Math.min(Math.floor(Number(qRawTi)), TILE_VALID_TIMES_COUNT - 1));
+        var qUrl = (TILE_OM_URLS && TILE_OM_URLS.length > qItem.idx && TILE_OM_URLS[qItem.idx])
+          ? TILE_OM_URLS[qItem.idx]
+          : TILE_SOURCE_URL + '&time_step=valid_times_' + qTi;
+        qLayer = adapter.createTileLayer('om://' + qUrl, {
+          opacity: 0, maxNativeZoom: OM_MAX_NATIVE_ZOOM, maxZoom: 19, pane: 'dataPane',
+        });
+        qLayer.addTo(map);
+        try { if (typeof qLayer.setZIndex === 'function') qLayer.setZIndex(410); } catch (_) {}
+        radarFrames[qItem.idx] = { layer: qLayer };
+        (function(l, fi) {
+          l.on('tileload', function() {
+            if (animationStarted) {
+              var aop = LAYER === 'wind' ? 0.56 : LAYER === 'temperature' ? 0.86 : LAYER === 'precipitation' ? 0.82 : 0.66;
+              setLayerOpacity(l, fi === currentFrame ? aop : 0);
+            }
+          });
+        })(qLayer, qItem.idx);
+      } else if (qItem.kind === 'wind') {
+        var qVTi = Math.max(0, Math.min(Math.floor(Number(qRawTi)), WIND_VECTOR_VALID_TIMES_COUNT - 1));
+        var qVUrl = (WIND_OM_URLS && WIND_OM_URLS.length > qItem.idx && WIND_OM_URLS[qItem.idx])
+          ? WIND_OM_URLS[qItem.idx]
+          : WIND_VECTOR_SOURCE_URL + '&time_step=valid_times_' + qVTi;
+        qLayer = adapter.createVectorTileLayer('om://' + qVUrl, {
+          opacity: 0, maxNativeZoom: OM_MAX_NATIVE_ZOOM, maxZoom: 19, pane: 'vectorPane',
           style: function(properties, layerName) {
-            // Different builds can expose different source-layer names
-            // (e.g. "wind-arrows", "wind_arrows", "arrows"). Style all
-            // line-like wind layers and keep others hidden.
             var ln = String(layerName || '').toLowerCase();
-            var looksLikeWind =
-              ln.indexOf('wind') >= 0 ||
-              ln.indexOf('arrow') >= 0 ||
-              ln.indexOf('vector') >= 0;
-            if (!looksLikeWind) return null;
+            if (ln.indexOf('wind') < 0 && ln.indexOf('arrow') < 0 && ln.indexOf('vector') < 0) return null;
             var raw = properties && properties.value !== undefined ? properties.value : 0;
-            var val = Number(raw);
-            if (!isFinite(val)) val = 0;
+            var val = Number(raw); if (!isFinite(val)) val = 0;
             var alpha = val > 5 ? 0.92 : val > 4 ? 0.84 : val > 3 ? 0.76 : val > 2 ? 0.66 : 0.54;
-            return {
-              strokeStyle: 'rgba(35, 185, 161,' + alpha + ')',
-              lineWidth: 2.4,
-              lineCap: 'round',
-              globalAlpha: 1
-            };
+            return { strokeStyle: 'rgba(35,185,161,' + alpha + ')', lineWidth: 2.4, lineCap: 'round', globalAlpha: 1 };
           }
         });
-        vectorLayer.addTo(map);
-        try { if (typeof vectorLayer.setZIndex === 'function') vectorLayer.setZIndex(420); } catch (_) {}
-        (function (vl, fk) {
-          vl.on('tileload', function () {
-            setLayerOpacity(vl, fk === currentFrame ? 0.9 : 0);
+        qLayer.addTo(map);
+        try { if (typeof qLayer.setZIndex === 'function') qLayer.setZIndex(420); } catch (_) {}
+        windVectorFrames[qItem.idx] = { layer: qLayer };
+        (function(l, fi) {
+          l.on('tileload', function() {
+            if (animationStarted) setLayerOpacity(l, fi === currentFrame ? 0.9 : 0);
           });
-        })(vectorLayer, k);
-        windVectorFrames.push({ layer: vectorLayer });
+        })(qLayer, qItem.idx);
       }
+      // Advance to next queue item after this layer's tiles are done.
+      var qDone = false;
+      function onQueueItemDone() {
+        if (qDone) return; qDone = true;
+        // Start animation as soon as the first radar frame is ready — clouds load async.
+        if (!animationStarted && radarFrames[currentFrame]) {
+          animationStarted = true;
+          showFrame(currentFrame);
+          startAnimation();
+          try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS })); } catch(e) {}
+        }
+        nextLoad();
+      }
+      qLayer.on('load', onQueueItemDone);
+      setTimeout(onQueueItemDone, 8000);
+    }
+    nextLoad();
+
+    // ── Cloud on-demand pool ──────────────────────────────────────────────────
+    // Load cloud tile layers one at a time. When cloud[N] finishes loading, cloud[N+1]
+    // starts and any frame older than N-1 is evicted from the map (map.removeLayer
+    // releases its WASM heap allocation). This rolling 2-layer window (current + next)
+    // keeps the total WASM budget to 4 radar + 2 cloud = 6 layers — no OOM.
+    var cloudPool = {};       // frameIdx → { layer }
+    var cloudLoadingIdx = -1; // which frame is currently being fetched (-1 = idle)
+
+    function buildCloudUrl(fi) {
+      var cRaw = (CLOUD_FRAME_INDICES && CLOUD_FRAME_INDICES.length > fi) ? CLOUD_FRAME_INDICES[fi] : frameIndexes[fi];
+      var cTi = Math.max(0, Math.min(Math.floor(Number(cRaw)), CLOUD_VALID_TIMES_COUNT - 1));
+      return (CLOUD_OM_URLS && CLOUD_OM_URLS.length > fi && CLOUD_OM_URLS[fi])
+        ? CLOUD_OM_URLS[fi]
+        : CLOUD_SOURCE_URL + '&time_step=valid_times_' + cTi;
     }
 
-    // Animated cloud frames — React passes frameCount/2 precip indices so total WASM tile
-    // layers = (frameCount/2 precip) + (frameCount/2 cloud) = frameCount, same budget as
-    // running without a cloud overlay. 8+8=16 caused OOM; 4+4=8 stays within the heap.
-    if (CLOUD_VALID_TIMES_COUNT > 0 && cloudActiveOpacity > 0) {
-      for (var j = 0; j < frameIndexes.length; j++) {
-        var cloudIdxRaw = (CLOUD_FRAME_INDICES && CLOUD_FRAME_INDICES.length > j) ? CLOUD_FRAME_INDICES[j] : frameIndexes[j];
-        var cloudTimeIndex = Math.max(0, Math.min(Math.floor(Number(cloudIdxRaw)), CLOUD_VALID_TIMES_COUNT - 1));
-        var omCloudUrl = (CLOUD_OM_URLS && CLOUD_OM_URLS.length > j && CLOUD_OM_URLS[j])
-          ? CLOUD_OM_URLS[j]
-          : CLOUD_SOURCE_URL + '&time_step=valid_times_' + cloudTimeIndex;
-        var cloudLayer = adapter.createTileLayer('om://' + omCloudUrl, {
-          opacity: j === currentFrame ? cloudActiveOpacity : 0,
-          maxNativeZoom: OM_MAX_NATIVE_ZOOM,
-          maxZoom: 19,
-          zIndex: 9,
-          pane: 'cloudPane',
+    function evictCloud(keepA, keepB) {
+      Object.keys(cloudPool).forEach(function(key) {
+        var k = parseInt(key);
+        if (k !== keepA && k !== keepB) {
+          try { map.removeLayer(cloudPool[k].layer); } catch(_) {}
+          delete cloudPool[k];
+        }
+      });
+    }
+
+    function loadNextCloud(fi) {
+      if (CLOUD_VALID_TIMES_COUNT === 0 || cloudActiveOpacity === 0) return;
+      // Frame already in pool — just make sure it's visible if it's the active frame.
+      if (cloudPool[fi]) {
+        if (currentFrame === fi) setLayerOpacity(cloudPool[fi].layer, cloudActiveOpacity);
+        return;
+      }
+      // Only one cloud layer loads at a time; the chain self-advances on 'load'.
+      if (cloudLoadingIdx !== -1) return;
+      cloudLoadingIdx = fi;
+      var nextFi = (fi + 1) % frameCount;
+      var cl = adapter.createTileLayer('om://' + buildCloudUrl(fi), {
+        opacity: 0, maxNativeZoom: OM_MAX_NATIVE_ZOOM, maxZoom: 19, pane: 'cloudPane',
+      });
+      cl.addTo(map);
+      try { if (typeof cl.setZIndex === 'function') cl.setZIndex(415); } catch(_) {}
+      cloudPool[fi] = { layer: cl };
+      (function(l, cfi, nfi) {
+        l.on('load', function() {
+          cloudLoadingIdx = -1;
+          if (currentFrame === cfi) setLayerOpacity(l, cloudActiveOpacity);
+          // Keep current + next in heap; evict everything else to free WASM memory.
+          evictCloud(cfi, nfi);
+          loadNextCloud(nfi);
         });
-        cloudLayer.addTo(map);
-        try { if (typeof cloudLayer.setZIndex === 'function') cloudLayer.setZIndex(415); } catch (_) {}
-        (function (cl, fj) {
-          cl.on('tileload', function () {
-            setLayerOpacity(cl, fj === currentFrame ? cloudActiveOpacity : 0);
-            if (fj === 0) { try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'cdbg', ev: 'load', fi: fj })); } catch (_) {} }
-          });
-          cl.on('tileerror', function (e) {
-            try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'cdbg', ev: 'err', fi: fj, msg: String(e && e.error ? e.error : e) })); } catch (_) {}
-          });
-        })(cloudLayer, j);
-        cloudFrames.push({ layer: cloudLayer });
-      }
+        l.on('tileerror', function(e) {
+          cloudLoadingIdx = -1;
+          try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'cdbg', ev: 'err', fi: cfi, msg: String(e && e.error ? e.error : e) })); } catch(_) {}
+        });
+      })(cl, fi, nextFi);
     }
 
-    showFrame(currentFrame);
-    startAnimation();
-
-    try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS }));
-    } catch (e) {}
+    // Fallback: if no tileload events fire within 4 s (e.g. static temp/air layers that load
+    // synchronously), start animation anyway so the UI doesn't stay blank indefinitely.
+    setTimeout(function() {
+      if (!animationStarted) {
+        animationStarted = true;
+        showFrame(currentFrame);
+        startAnimation();
+        try {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'timeline', times: FRAME_TIME_LABELS }));
+        } catch (e) {}
+      }
+    }, 4000);
 
     function handleRnMessage(e) {
       try {
@@ -491,7 +541,7 @@ export function buildMapHTML(
         if (msg.type === 'pause') { isPlaying = false; }
         if (msg.type === 'seek' && typeof msg.index === 'number') {
           var si = Math.floor(msg.index);
-          if (si >= 0 && si < radarFrames.length) {
+          if (si >= 0 && si < frameCount) {
             currentFrame = si;
             showFrame(currentFrame);
           }
@@ -631,6 +681,12 @@ function buildOmFileUrl(
   return queryStr ? `${resolvedBase}?${queryStr}` : resolvedBase
 }
 
+/**
+ * Total animated tile layers budget.
+ * WASM heap OOM observed at 10+ concurrent layers. Keep to 8 max total:
+ * With cloud overlay: 4 precip + 4 cloud = 8 layers (safe margin below OOM threshold).
+ * Without cloud overlay: up to 8 precipitation frames for the 12-hour window.
+ */
 const MAX_MAP_FRAMES = 8
 
 function injectSeekScript(index: number): string {
@@ -727,15 +783,10 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       if (one !== null) return finalize([one])
       return finalize([0])
     }
-    // Cloud overlay uses the same WASM heap as the primary animated layer.
-    // If clouds are available, keeping full frame count for both doubles tile layers
-    // and can trip WebView OOM (observed as RuntimeError: Aborted(OOM)).
-    // Budget total animated layers to MAX_MAP_FRAMES by splitting frame count in half.
-    const frameCount =
-      tileMeta.cloudValidTimesLength > 0
-        ? Math.floor(MAX_MAP_FRAMES / 2)
-        : MAX_MAP_FRAMES
-    return finalize(buildFullModelDisplayFrameIndices(tl, frameCount))
+    // Use the full frame budget for radar — cloud WASM overlay is disabled (OOM risk).
+    const frameCount = MAX_MAP_FRAMES
+    // Show only the next 12 hours from now — not the full model run which spans days.
+    return finalize(buildDisplayFrameApiIndices(tileMeta.validTimes, 12, frameCount, nowMs))
   })()
   const frameTimeLabels = displayIndexes.map((i) => tileMeta.validTimes[i] ?? '')
   const initialFrameIndex = useStaticSingleFrame ? 0 : indexOfFrameNearestToNow(frameTimeLabels, nowMs)

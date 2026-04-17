@@ -69,8 +69,8 @@ async function fetchTileMetadata(url: string): Promise<{ validTimes: string[]; r
   if (!validateOpenMeteoValidTimesPayload(json).ok) return { validTimes: [], referenceTime: '' }
   const parsed = json as TileMetadataJson
   const validTimes = parseValidTimes(parsed)
-  const rawRef = parsed.reference_time
-  const referenceTime = typeof rawRef === 'string' ? rawRef : ''
+  // reference_time can be ISO string or Unix seconds/ms — normalise the same way as valid_times
+  const referenceTime = validTimeToIso(parsed.reference_time)
   return { validTimes, referenceTime }
 }
 

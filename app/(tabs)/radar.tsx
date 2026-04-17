@@ -1,12 +1,12 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
   ActivityIndicator,
-  StatusBar,
-  TouchableOpacity,
   Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -106,6 +106,8 @@ export default function RadarScreen() {
   const [isPickerOpen, setPickerOpen] = useState(false)
   const [frameTimes, setFrameTimes] = useState<string[]>([])
   const [currentTimeIso, setCurrentTimeIso] = useState<string | null>(null)
+  /** True once the WebView signals the initial tiles have loaded and the animation has started. */
+  const [tilesReady, setTilesReady] = useState(false)
 
   const mapRef = useRef<WeatherMapHandle>(null)
 
@@ -120,6 +122,7 @@ export default function RadarScreen() {
 
   const handleTimelineReady = useCallback((times: string[]) => {
     setFrameTimes(times)
+    setTilesReady(true)
   }, [])
 
   const togglePlayPause = () => {
@@ -146,6 +149,7 @@ export default function RadarScreen() {
     setFrameTimes([])
     setCurrentTimeIso(null)
     setIsPlaying(true)
+    setTilesReady(false)
   }, [activeLayer, lat, lon])
 
   if (isLoading || !weather) {
@@ -241,31 +245,45 @@ export default function RadarScreen() {
           })}
         </View>
 
-        {totalFrames > 0 &&
-          activeLayer !== 'temperature' &&
-          activeLayer !== 'air' && (
+        {activeLayer !== 'temperature' && activeLayer !== 'air' && (
           <View style={styles.timelineCard} pointerEvents="auto">
             <View style={styles.timelineTopRow}>
-              <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
-                <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={ACCENT_SOFT} />
+              <TouchableOpacity
+                style={[styles.playButton, !tilesReady && styles.playButtonDisabled]}
+                onPress={tilesReady ? togglePlayPause : undefined}
+                activeOpacity={tilesReady ? 0.75 : 1}
+              >
+                {tilesReady ? (
+                  <Ionicons name={isPlaying ? 'pause' : 'play'} size={20} color={ACCENT_SOFT} />
+                ) : (
+                  <ActivityIndicator size="small" color={ACCENT_SOFT} />
+                )}
               </TouchableOpacity>
               <View style={styles.timeBlock}>
-                <Text style={styles.timeLabel}>Map time</Text>
+                <Text style={styles.timeLabel}>
+                  {tilesReady ? 'Map time' : 'Syncing radar…'}
+                </Text>
                 <Text style={styles.timeHero} numberOfLines={1}>
-                  {formatHeroTime(currentTimeIso)}
+                  {tilesReady ? formatHeroTime(currentTimeIso) : '—'}
                 </Text>
               </View>
             </View>
-            <RadarTimeScrubber
-              key={`${activeLayer}-${totalFrames}`}
-              times={Array.from({ length: totalFrames }, (_, i) => frameTimes[i] ?? '')}
-              selectedIndex={Math.min(frameIndex, Math.max(0, totalFrames - 1))}
-              onSelectIndex={onSelectFrame}
-              onInteractionStart={() => {
-                mapRef.current?.pause()
-                setIsPlaying(false)
-              }}
-            />
+            {tilesReady && totalFrames > 0 ? (
+              <RadarTimeScrubber
+                key={`${activeLayer}-${totalFrames}`}
+                times={Array.from({ length: totalFrames }, (_, i) => frameTimes[i] ?? '')}
+                selectedIndex={Math.min(frameIndex, Math.max(0, totalFrames - 1))}
+                isPlaying={isPlaying}
+                frameIntervalMs={1200}
+                onSelectIndex={onSelectFrame}
+                onInteractionStart={() => {
+                  mapRef.current?.pause()
+                  setIsPlaying(false)
+                }}
+              />
+            ) : (
+              <View style={styles.timelineSkeleton} />
+            )}
           </View>
         )}
       </View>
@@ -434,5 +452,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: TEXT_SECONDARY,
     letterSpacing: 0.3,
+  },
+  playButtonDisabled: {
+    opacity: 0.55,
+  },
+  timelineSkeleton: {
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginTop: 4,
   },
 })
