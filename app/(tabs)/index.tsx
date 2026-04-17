@@ -120,6 +120,8 @@ export default function HomeScreen() {
         precipitationProbability={current.precipitationProbability}
         hourlyPrecipitationMax={hourlyPrecipMax12h}
         hourlyForecastHasRainish={hourlyForecastHasRainish}
+        sunrise={sunrise}
+        sunset={sunset}
       />
       <LinearGradient
         colors={scrim.colors}

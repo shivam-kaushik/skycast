@@ -13,10 +13,52 @@ export type AmbientVisualKind =
   | 'fog'
   | 'thunder'
 
+/**
+ * Time-of-day phase used to drive gradient palette selection and atmospheric effects.
+ * - dawn:      ±50 min around sunrise
+ * - morning:   after dawn window → solar noon
+ * - afternoon: solar noon → before dusk window
+ * - dusk:      ±50 min around sunset
+ * - night:     after dusk window → before dawn window
+ */
+export type TimePhase = 'dawn' | 'morning' | 'afternoon' | 'dusk' | 'night'
+
+/** Half of the dawn/dusk transition window (ms). */
+const TRANSITION_HALF_MS = 50 * 60 * 1000
+
 const THUNDER_CODES = new Set([82, 95, 96, 99])
 const SNOW_CODES = new Set([71, 73, 75, 77, 85, 86])
 const RAIN_CODES = new Set([51, 53, 55, 61, 63, 65, 80, 81])
 const FOG_CODES = new Set([45, 48])
+
+/**
+ * Determine the time-of-day phase from sunrise/sunset ISO strings.
+ * Falls back to 'morning' when the strings are missing or unparseable.
+ */
+export function getTimePhase(
+  sunriseIso: string,
+  sunsetIso: string,
+  now: Date = new Date(),
+): TimePhase {
+  try {
+    const sunrise = parseISO(sunriseIso)
+    const sunset = parseISO(sunsetIso)
+    if (!isValid(sunrise) || !isValid(sunset)) return 'morning'
+
+    const t = now.getTime()
+    const rise = sunrise.getTime()
+    const set = sunset.getTime()
+
+    if (t >= rise - TRANSITION_HALF_MS && t < rise + TRANSITION_HALF_MS) return 'dawn'
+    if (t >= set - TRANSITION_HALF_MS && t < set + TRANSITION_HALF_MS) return 'dusk'
+    if (t >= rise && t < set) {
+      return (t - rise) / (set - rise) < 0.5 ? 'morning' : 'afternoon'
+    }
+    return 'night'
+  } catch {
+    return 'morning'
+  }
+}
 
 /**
  * True when `now` is between sunrise and sunset (local API instants).
