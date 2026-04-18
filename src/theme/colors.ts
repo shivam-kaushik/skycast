@@ -1,30 +1,33 @@
-/** Skycast “Stitch” / ethereal design tokens — see `stitch/skycast_ethereal/DESIGN.md` */
-export const BG = '#0e1322'
+/** Skycast — warm-cinematic design tokens (earth-observation palette) */
 
-export const GLASS_BG = 'rgba(255, 255, 255, 0.08)'
-/** Ghost border — warm tint, low opacity (no hard white rules) */
-export const GHOST_BORDER = 'rgba(79, 70, 50, 0.15)'
-/** @deprecated Use GHOST_BORDER; kept for gradual migration */
+/** Near-black with a warm amber undertone — lets the ambient sky/globe backgrounds breathe */
+export const BG = '#080705'
+
+/** Warm dark glass — amber-tinted frosted surface */
+export const GLASS_BG = 'rgba(22, 17, 9, 0.72)'
+/** Amber ghost border — very low opacity so it reads as warmth not clutter */
+export const GHOST_BORDER = 'rgba(220, 165, 60, 0.14)'
+/** @deprecated Use GHOST_BORDER */
 export const GLASS_BORDER = GHOST_BORDER
 
-export const ON_SURFACE = '#dee1f7'
+export const ON_SURFACE = '#f0e8d8'
 export const TEXT_PRIMARY = ON_SURFACE
-export const TEXT_SECONDARY = 'rgba(222, 225, 247, 0.65)'
-export const TEXT_TERTIARY = 'rgba(222, 225, 247, 0.4)'
-export const ON_SURFACE_VARIANT = '#d4c5ab'
+export const TEXT_SECONDARY = 'rgba(240, 232, 216, 0.65)'
+export const TEXT_TERTIARY = 'rgba(240, 232, 216, 0.38)'
+export const ON_SURFACE_VARIANT = '#d4b87a'
 
 /** Primary gold / amber */
-export const ACCENT = '#ffc107'
-export const ACCENT_SOFT = '#ffe4af'
-export const ON_PRIMARY = '#3f2e00'
+export const ACCENT = '#f5a623'
+export const ACCENT_SOFT = '#ffd98a'
+export const ON_PRIMARY = '#2a1a00'
 
 /** Data viz & cool accents */
-export const SECONDARY = '#a4c9ff'
-export const SECONDARY_CONTAINER = '#3b93f3'
+export const SECONDARY = '#7bbfff'
+export const SECONDARY_CONTAINER = '#2b7de0'
 
-export const SURFACE_CONTAINER = '#1a1f2f'
-export const SURFACE_CONTAINER_HIGH = '#25293a'
-export const SURFACE_CONTAINER_HIGHEST = '#2f3445'
+export const SURFACE_CONTAINER = '#14100A'
+export const SURFACE_CONTAINER_HIGH = '#1e180E'
+export const SURFACE_CONTAINER_HIGHEST = '#28200F'
 
 export const GOOD = '#06D6A0'
 export const WARNING = '#FFD166'

@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: GLASS_BG,
     borderColor: GHOST_BORDER,
-    borderRadius: 24,
-    borderWidth: 1.5,
+    borderRadius: 22,
+    borderWidth: 1,
   },
 })

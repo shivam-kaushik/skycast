@@ -70,8 +70,7 @@ export default function StitchTabBar({ state, descriptors, navigation }: BottomT
                 <Ionicons
                   name={name}
                   size={22}
-                  color={isFocused ? BG : 'rgba(222, 225, 247, 0.88)'}
-                  style={isFocused ? styles.iconActive : styles.iconIdle}
+                  color={isFocused ? BG : 'rgba(240, 232, 216, 0.75)'}
                 />
               </Pressable>
             )
@@ -97,7 +96,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.10)',
     ...Platform.select({
       ios: {
         shadowColor: ACCENT_SOFT,
@@ -115,7 +114,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(26, 31, 47, 0.4)',
+    backgroundColor: 'rgba(10, 8, 4, 0.42)',
   },
   tabBtn: {
     width: 48,
@@ -128,7 +127,7 @@ const styles = StyleSheet.create({
     backgroundColor: ON_SURFACE,
     ...Platform.select({
       ios: {
-        shadowColor: '#fff',
+        shadowColor: ON_SURFACE,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.5,
         shadowRadius: 12,
@@ -139,11 +138,5 @@ const styles = StyleSheet.create({
   },
   tabBtnPressed: {
     opacity: 0.85,
-  },
-  iconActive: {
-    opacity: 1,
-  },
-  iconIdle: {
-    opacity: 0.9,
   },
 })

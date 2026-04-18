@@ -1,0 +1,187 @@
+/** Builds the self-contained HTML string for the 3D globe WebView. */
+
+export type GlobeLayer = 'precipitation' | 'temperature' | 'wind' | 'air'
+
+export interface GlobeWeatherData {
+  temperature: number
+  precipitationProbability: number
+  windSpeed: number
+  windDirection: number
+  usAqi: number
+  conditionLabel: string
+}
+
+export function buildGlobeHTML(
+  lat: number,
+  lon: number,
+  layer: GlobeLayer,
+  weather: GlobeWeatherData,
+): string {
+  // Inject all dynamic values as a single JSON blob — avoids TypeScript template-literal
+  // conflicts with JS code that uses ${} inside the HTML string.
+  const injected = JSON.stringify({
+    lat,
+    lon,
+    layer,
+    temp: Math.round(weather.temperature),
+    precip: weather.precipitationProbability,
+    wind: Math.round(weather.windSpeed),
+    windDir: weather.windDirection,
+    aqi: weather.usAqi,
+    cond: weather.conditionLabel,
+  })
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #04030a; overflow: hidden; }
+    #globe { width: 100%; height: 100%; }
+    #loader {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #04030a;
+      pointer-events: none;
+      transition: opacity 1s ease;
+    }
+    #loader.fade { opacity: 0; }
+    .spinner {
+      width: 38px; height: 38px;
+      border: 2px solid rgba(245, 166, 35, 0.12);
+      border-top-color: #f5a623;
+      border-radius: 50%;
+      animation: spin 0.85s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div id="globe"></div>
+<div id="loader"><div class="spinner"></div></div>
+
+<!-- Load Three.js globals first so we can access window.THREE for the cloud mesh -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
+<!-- globe.gl — tiny (45kB gz), wraps Three.js OrbitControls + sphere rendering -->
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.27.1/dist/globe.gl.min.js"></script>
+
+<script>
+(function() {
+  'use strict';
+  var D = ${injected};
+
+  // ── Accent colour driven by active layer / temperature ─────────────────────
+  function tempAccent(c) {
+    if (c < -10) return '#7bb8ff';
+    if (c < 0)   return '#a0c8ff';
+    if (c < 10)  return '#c8e4ff';
+    if (c < 20)  return '#ffd98a';
+    if (c < 28)  return '#f5a623';
+    return '#ff6b6b';
+  }
+
+  function windDirLabel(deg) {
+    var dirs = ['N','NE','E','SE','S','SW','W','NW'];
+    return dirs[Math.round(deg / 45) % 8] || 'N';
+  }
+
+  var accent =
+    D.layer === 'wind'          ? '#7bbfff' :
+    D.layer === 'air'           ? '#06D6A0' :
+    D.layer === 'precipitation' ? '#a8d8ff' :
+    tempAccent(D.temp);
+
+  var labelValue =
+    D.layer === 'temperature'   ? (D.temp + '\\u00b0') :
+    D.layer === 'precipitation' ? (D.precip + '%') :
+    D.layer === 'wind'          ? (D.wind + ' km/h ' + windDirLabel(D.windDir)) :
+    D.layer === 'air'           ? (D.aqi > 0 ? ('AQI ' + D.aqi) : D.cond) :
+    (D.temp + '\\u00b0');
+
+  // ── Build globe ────────────────────────────────────────────────────────────
+  var globe = Globe()(document.getElementById('globe'))
+    .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg')
+    .bumpImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png')
+    .backgroundImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png')
+    .showAtmosphere(true)
+    .atmosphereColor(accent)
+    .atmosphereAltitude(0.18)
+    .showGraticules(false);
+
+  // ── Pulsing ring at user location ──────────────────────────────────────────
+  globe
+    .ringsData([{ lat: D.lat, lng: D.lon, maxR: 5, speed: 1.5, period: 1400 }])
+    .ringColor(function() { return accent; })
+    .ringMaxRadius('maxR')
+    .ringPropagationSpeed('speed')
+    .ringRepeatPeriod('period');
+
+  // ── Data label floating above location ────────────────────────────────────
+  globe
+    .labelsData([{ lat: D.lat + 4.5, lng: D.lon, text: labelValue }])
+    .labelText('text')
+    .labelSize(0.85)
+    .labelDotRadius(0.4)
+    .labelColor(function() { return accent; })
+    .labelResolution(3);
+
+  // ── On globe ready: add cloud shell + notify RN ───────────────────────────
+  globe.onGlobeReady(function() {
+    // Fade out loader
+    var loader = document.getElementById('loader');
+    if (loader) {
+      loader.classList.add('fade');
+      setTimeout(function() { loader.style.display = 'none'; }, 1100);
+    }
+
+    // Cloud sphere — separate slowly-rotating Three.js mesh
+    try {
+      var scene = globe.scene();
+      var RADIUS = (globe.getGlobeRadius ? globe.getGlobeRadius() : 100);
+      new THREE.TextureLoader().load(
+        'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-clouds.png',
+        function(tex) {
+          var cloudMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(RADIUS * 1.006, 64, 64),
+            new THREE.MeshPhongMaterial({
+              map: tex, transparent: true, opacity: 0.26, depthWrite: false
+            })
+          );
+          scene.add(cloudMesh);
+          (function spinCloud() {
+            cloudMesh.rotation.y += 0.00022;
+            requestAnimationFrame(spinCloud);
+          })();
+        }
+      );
+    } catch (_) {
+      // Cloud shell failed — globe still renders without it
+    }
+
+    try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' })); } catch (_) {}
+  });
+
+  // ── Camera setup — cinematic entry pan ────────────────────────────────────
+  globe.pointOfView({ lat: D.lat, lng: D.lon, altitude: 2.5 });
+  setTimeout(function() {
+    var ctrl = globe.controls();
+    ctrl.autoRotate      = true;
+    ctrl.autoRotateSpeed = 0.42;
+    ctrl.enableZoom      = false;
+    ctrl.enablePan       = false;
+    ctrl.enableDamping   = true;
+    ctrl.dampingFactor   = 0.08;
+    globe.pointOfView({ lat: D.lat, lng: D.lon, altitude: 1.9 }, 2800);
+  }, 250);
+
+  // ── Error relay to React Native ────────────────────────────────────────────
+  window.onerror = function(msg) {
+    try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', msg: String(msg) })); } catch (_) {}
+  };
+})();
+</script>
+</body>
+</html>`
+}

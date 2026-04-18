@@ -1,5 +1,13 @@
 import React, { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, StatusBar, TouchableOpacity } from 'react-native'
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  StatusBar,
+  TouchableOpacity,
+} from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -28,7 +36,7 @@ import {
   ON_SURFACE_VARIANT,
   SECONDARY,
 } from '@/src/theme/colors'
-import { FONT_BOLD, FONT_EXTRABOLD, FONT_MEDIUM } from '@/src/theme/typography'
+import { FONT_BOLD, FONT_EXTRABOLD, FONT_MEDIUM, FONT_REGULAR } from '@/src/theme/typography'
 import { getAmbientVisualKind, hasRainishHourlyInNextHours, isDaytimeFromSun } from '@/src/utils/ambientWeatherKind'
 import { homeScrimGradient } from '@/src/utils/homeAmbientOverlay'
 import { maxPrecipitationProbabilityNextHours } from '@/src/utils/hourlyPrecipMax'
@@ -36,6 +44,11 @@ import { maxPrecipitationProbabilityNextHours } from '@/src/utils/hourlyPrecipMa
 function tempNumber(value: number, unit: 'C' | 'F'): string {
   if (unit === 'F') return String(Math.round(value * (9 / 5) + 32))
   return String(Math.round(value))
+}
+
+function windDirShort(deg: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const
+  return dirs[Math.round(deg / 45) % 8] ?? 'N'
 }
 
 export default function HomeScreen() {
@@ -102,14 +115,15 @@ export default function HomeScreen() {
   const { current, hourly, daily } = weather
   const { label: conditionLabel } = getWeatherCodeInfo(current.weatherCode)
   const num = tempNumber(current.temperature, unit)
+  const feelsNum = tempNumber(current.apparentTemperature, unit)
   const sunrise = daily.sunrise[0] ?? ''
   const sunset = daily.sunset[0] ?? ''
   const isDay = isDaytimeFromSun(sunrise, sunset)
   const ambientKind = getAmbientVisualKind(current.weatherCode, isDay)
   const scrim = homeScrimGradient(ambientKind)
-  /** Next ~12h window: ambient rain should track “soon” conditions, not tomorrow night’s forecast. */
   const hourlyPrecipMax12h = maxPrecipitationProbabilityNextHours(hourly, 12)
   const hourlyForecastHasRainish = hasRainishHourlyInNextHours(hourly, 12)
+  const windDir = windDirShort(current.windDirection)
 
   return (
     <View style={styles.root}>
@@ -136,58 +150,85 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Minimal header ──────────────────────────────────────── */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.locationRow} onPress={() => setPickerOpen(true)}>
-              <Ionicons name="location-sharp" size={20} color={ACCENT} />
-              <Text style={styles.cityName}>{cityName || 'Your Location'}</Text>
+            <TouchableOpacity style={styles.locationBtn} onPress={() => setPickerOpen(true)} activeOpacity={0.85}>
+              <Ionicons name="location-sharp" size={14} color={ACCENT} />
+              <Text style={styles.locationText} numberOfLines={1}>{cityName || 'Your Location'}</Text>
+              <Ionicons name="chevron-down" size={13} color={TEXT_TERTIARY} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setUnit(unit === 'C' ? 'F' : 'C')}
-              style={styles.headerPill}
-              activeOpacity={0.85}
+              style={styles.unitPill}
+              activeOpacity={0.8}
             >
-              <Text style={styles.headerPillTemp}>{formatTemp(current.temperature, unit)}</Text>
-              <View style={styles.headerDivider} />
-              <Ionicons
-                name={isDay ? 'sunny-outline' : 'moon-outline'}
-                size={18}
-                color={ACCENT_SOFT}
-              />
+              <Text style={styles.unitText}>°{unit}</Text>
             </TouchableOpacity>
           </View>
 
+          {/* ── Hero temperature block ───────────────────────────────── */}
           <View style={styles.heroBlock}>
-            <View style={styles.heroLeft}>
-              <View style={styles.tempRow}>
-                <Text style={styles.heroNum}>{num}</Text>
-                <Text style={styles.heroDeg}>°</Text>
+            {/* Large temperature */}
+            <View style={styles.tempRow}>
+              <Text style={styles.heroNum}>{num}</Text>
+              <Text style={styles.heroDeg}>°</Text>
+            </View>
+
+            {/* Unit + city */}
+            <Text style={styles.heroUnitCity}>
+              {unit === 'C' ? 'celsius' : 'fahrenheit'}{' '}
+              <Text style={styles.heroCityDot}>·</Text>{' '}
+              <Text style={styles.heroCityName}>{cityName || 'Your Location'}</Text>
+            </Text>
+
+            {/* Condition in italic */}
+            <Text style={styles.conditionLabel}>It's {conditionLabel.toLowerCase()}</Text>
+
+            {/* Compact meta rows */}
+            <View style={styles.metaGrid}>
+              <View style={styles.metaItem}>
+                <View style={[styles.metaDot, { backgroundColor: ACCENT }]} />
+                <Text style={styles.metaLabel}>Feels like</Text>
+                <Text style={styles.metaValue}>{feelsNum}°</Text>
               </View>
-              <Text style={styles.conditionHeadline}>{conditionLabel}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>
-                  Feels like {formatTemp(current.apparentTemperature, unit)}
-                </Text>
-                <View style={styles.metaDot} />
-                <View style={styles.rainRow}>
-                  <Ionicons name="water-outline" size={14} color={SECONDARY} />
-                  <Text style={styles.rainText}>{current.precipitationProbability}% rain</Text>
-                </View>
+              <View style={styles.metaDivider} />
+              <View style={styles.metaItem}>
+                <Ionicons name="navigate-outline" size={12} color={SECONDARY} />
+                <Text style={styles.metaLabel}>{windDir}</Text>
+                <Text style={styles.metaValue}>{Math.round(current.windSpeed)} km/h</Text>
+              </View>
+              <View style={styles.metaDivider} />
+              <View style={styles.metaItem}>
+                <Ionicons name="sunny-outline" size={12} color={ACCENT} />
+                <Text style={styles.metaLabel}>UV</Text>
+                <Text style={styles.metaValue}>{Math.round(current.uvIndex)}</Text>
+              </View>
+              <View style={styles.metaDivider} />
+              <View style={styles.metaItem}>
+                <Ionicons name="water-outline" size={12} color={SECONDARY} />
+                <Text style={styles.metaValue}>{current.precipitationProbability}%</Text>
               </View>
             </View>
           </View>
 
+          {/* ── Daily brief ─────────────────────────────────────────── */}
           <DailyBriefCard current={current} hourly={hourly} />
 
           <View style={styles.spacer} />
 
+          {/* ── Hourly forecast ─────────────────────────────────────── */}
           <View style={styles.sectionHeader}>
             <SectionLabel text="Hourly Forecast" />
-            <Text style={styles.sectionLink}>Live</Text>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live</Text>
+            </View>
           </View>
           <HourlyStrip hourly={hourly} daily={daily} unit={unit} />
 
           <View style={styles.spacer} />
 
+          {/* ── 14-day forecast ─────────────────────────────────────── */}
           <View style={styles.sectionHeader}>
             <SectionLabel text="14-Day Forecast" />
           </View>
@@ -195,8 +236,9 @@ export default function HomeScreen() {
 
           <View style={styles.spacer} />
 
+          {/* ── Atmospheric conditions ──────────────────────────────── */}
           <View style={styles.sectionHeader}>
-            <SectionLabel text="Atmospheric Conditions" />
+            <SectionLabel text="Conditions" />
           </View>
           <MetricTilesGrid current={current} />
 
@@ -234,7 +276,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 4,
-    paddingBottom: 120,
+    paddingBottom: 130,
   },
   centered: {
     flex: 1,
@@ -245,18 +287,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
+    ...FONT_MEDIUM,
     fontSize: 14,
     color: TEXT_SECONDARY,
     marginTop: 8,
   },
   errorTitle: {
+    ...FONT_BOLD,
     fontSize: 18,
-    fontWeight: '700',
     color: TEXT_PRIMARY,
     textAlign: 'center',
     marginTop: 8,
   },
   errorSubtitle: {
+    ...FONT_REGULAR,
     fontSize: 14,
     color: TEXT_SECONDARY,
     textAlign: 'center',
@@ -270,54 +314,56 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
   },
   retryText: {
+    ...FONT_BOLD,
     color: ON_PRIMARY,
-    fontWeight: '700',
     fontSize: 14,
   },
+
+  // ── Header ────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cityName: {
-    ...FONT_BOLD,
-    fontSize: 18,
-    color: TEXT_PRIMARY,
-  },
-  headerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(79, 70, 50, 0.15)',
-  },
-  headerPillTemp: {
-    ...FONT_BOLD,
-    fontSize: 14,
-    color: TEXT_PRIMARY,
-  },
-  headerDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: 'rgba(79, 70, 50, 0.25)',
-  },
-  heroBlock: {
-    paddingHorizontal: 20,
     paddingBottom: 8,
+    paddingTop: 4,
   },
-  heroLeft: {
-    gap: 6,
+  locationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(22, 17, 9, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 165, 60, 0.2)',
+  },
+  locationText: {
+    ...FONT_BOLD,
+    fontSize: 13,
+    color: TEXT_PRIMARY,
+    maxWidth: 160,
+  },
+  unitPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(22, 17, 9, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 165, 60, 0.2)',
+  },
+  unitText: {
+    ...FONT_BOLD,
+    fontSize: 13,
+    color: ACCENT_SOFT,
+  },
+
+  // ── Hero ──────────────────────────────────────────────────────
+  heroBlock: {
+    paddingHorizontal: 22,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   tempRow: {
     flexDirection: 'row',
@@ -325,51 +371,77 @@ const styles = StyleSheet.create({
   },
   heroNum: {
     ...FONT_EXTRABOLD,
-    fontSize: 112,
-    lineHeight: 118,
+    fontSize: 108,
+    lineHeight: 112,
     color: TEXT_PRIMARY,
-    letterSpacing: -4,
+    letterSpacing: -5,
   },
   heroDeg: {
     ...FONT_BOLD,
-    fontSize: 40,
+    fontSize: 44,
     color: ACCENT,
-    marginTop: 10,
+    marginTop: 8,
+    letterSpacing: 0,
   },
-  conditionHeadline: {
-    ...FONT_MEDIUM,
-    fontSize: 28,
-    color: TEXT_PRIMARY,
-    marginTop: 4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
-    flexWrap: 'wrap',
-  },
-  metaText: {
+  heroUnitCity: {
     ...FONT_MEDIUM,
     fontSize: 15,
     color: ON_SURFACE_VARIANT,
+    marginTop: 2,
+    letterSpacing: 0.3,
   },
-  metaDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: 'rgba(79, 70, 50, 0.5)',
+  heroCityDot: {
+    color: TEXT_TERTIARY,
   },
-  rainRow: {
+  heroCityName: {
+    ...FONT_BOLD,
+    color: ACCENT_SOFT,
+  },
+  conditionLabel: {
+    ...FONT_REGULAR,
+    fontSize: 22,
+    color: TEXT_PRIMARY,
+    marginTop: 8,
+    letterSpacing: 0.2,
+    fontStyle: 'italic',
+  },
+
+  // ── Meta grid ────────────────────────────────────────────────
+  metaGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingHorizontal: 2,
+    flexWrap: 'nowrap',
+  },
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  rainText: {
-    ...FONT_MEDIUM,
-    fontSize: 15,
-    color: SECONDARY,
+  metaDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
+  metaLabel: {
+    ...FONT_MEDIUM,
+    fontSize: 12,
+    color: TEXT_TERTIARY,
+  },
+  metaValue: {
+    ...FONT_BOLD,
+    fontSize: 12,
+    color: TEXT_SECONDARY,
+  },
+  metaDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(220, 165, 60, 0.2)',
+    marginHorizontal: 8,
+  },
+
+  // ── Section header ───────────────────────────────────────────
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -377,14 +449,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
-  sectionLink: {
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 166, 35, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.25)',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: ACCENT,
+  },
+  liveText: {
     ...FONT_BOLD,
-    fontSize: 11,
+    fontSize: 10,
     color: ACCENT,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   spacer: {
-    height: 24,
+    height: 28,
   },
   bottomPad: {
     height: 24,

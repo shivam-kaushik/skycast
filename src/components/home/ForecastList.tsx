@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   rowBorder: {
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: 'rgba(220, 165, 60, 0.1)',
     borderBottomWidth: 1,
   },
   dayLabel: {

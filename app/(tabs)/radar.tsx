@@ -13,12 +13,14 @@ import { Ionicons } from '@expo/vector-icons'
 import type { ComponentProps } from 'react'
 import { format } from 'date-fns'
 import { parseTimelineInstant } from '@/src/utils/timelineInstant'
+import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { useLocationStore } from '@/src/store/locationStore'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useLocation } from '@/src/hooks/useLocation'
 import WeatherMapView from '@/src/components/radar/WeatherMapView'
 import type { MapLayer, WeatherMapHandle } from '@/src/components/radar/WeatherMapView'
+import GlobeView from '@/src/components/radar/GlobeView'
 import RadarLegend from '@/src/components/radar/RadarLegend'
 import RadarTimeScrubber from '@/src/components/radar/RadarTimeScrubber'
 import LocationPickerModal from '@/src/components/home/LocationPickerModal'
@@ -38,9 +40,9 @@ type IoniconName = ComponentProps<typeof Ionicons>['name']
 /** Space above the floating tab bar so layer + timeline are not obscured */
 const TAB_BAR_CLEARANCE = 92
 
-/** Navy glass floater: readable on light map basemaps, aligned with Stitch surfaces (#1a1f2f) */
-const RADAR_FLOAT_SURFACE = 'rgba(26, 31, 47, 0.93)'
-const RADAR_FLOAT_BORDER = 'rgba(222, 225, 247, 0.16)'
+/** Warm dark glass floater — consistent with app GLASS_BG surface */
+const RADAR_FLOAT_SURFACE = 'rgba(18, 13, 6, 0.90)'
+const RADAR_FLOAT_BORDER = 'rgba(220, 165, 60, 0.18)'
 
 interface LayerConfig {
   key: MapLayer
@@ -104,6 +106,8 @@ export default function RadarScreen() {
   const [frameIndex, setFrameIndex] = useState(0)
   const [totalFrames, setTotalFrames] = useState(0)
   const [isPickerOpen, setPickerOpen] = useState(false)
+  const [isLayerMenuOpen, setLayerMenuOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'map' | 'globe'>('map')
   const [frameTimes, setFrameTimes] = useState<string[]>([])
   const [currentTimeIso, setCurrentTimeIso] = useState<string | null>(null)
   /** True once the WebView signals the initial tiles have loaded and the animation has started. */
@@ -174,78 +178,137 @@ export default function RadarScreen() {
 
   const activeConfig = LAYERS.find((l) => l.key === activeLayer) ?? LAYERS[0]!
   const bottomPad = insets.bottom + TAB_BAR_CLEARANCE
+  const { label: conditionLabel } = getWeatherCodeInfo(weather.current.weatherCode)
+  const globeWeather = {
+    temperature: weather.current.temperature,
+    precipitationProbability: weather.current.precipitationProbability,
+    windSpeed: weather.current.windSpeed,
+    windDirection: weather.current.windDirection,
+    usAqi: airQuality?.current.usAqi ?? 0,
+    conditionLabel,
+  }
 
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <WeatherMapView
-        ref={mapRef}
-        lat={lat}
-        lon={lon}
-        layer={activeLayer}
-        weather={weather}
-        airQuality={airQuality}
-        onFrameUpdate={handleFrameUpdate}
-        onTimelineReady={handleTimelineReady}
-      />
+      {viewMode === 'map' ? (
+        <WeatherMapView
+          ref={mapRef}
+          lat={lat}
+          lon={lon}
+          layer={activeLayer}
+          weather={weather}
+          airQuality={airQuality}
+          onFrameUpdate={handleFrameUpdate}
+          onTimelineReady={handleTimelineReady}
+        />
+      ) : (
+        <GlobeView
+          lat={lat}
+          lon={lon}
+          layer={activeLayer as 'precipitation' | 'temperature' | 'wind' | 'air'}
+          weather={globeWeather}
+        />
+      )}
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topColumn} pointerEvents="box-none">
-          <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
-            <Ionicons name="location-sharp" size={18} color={ACCENT} />
-            <Text style={styles.cityName} numberOfLines={1}>
-              {cityName || 'Your Location'}
-            </Text>
-            <Ionicons name="chevron-down" size={18} color={ACCENT_SOFT} />
-            <View style={[styles.layerBadge, { borderColor: activeConfig.color }]}>
-              <Text
-                style={[styles.layerBadgeText, { color: activeConfig.color }]}
-                numberOfLines={2}
-              >
-                {activeConfig.description}
+          <View style={styles.topRow} pointerEvents="auto">
+            <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
+              <Ionicons name="location-sharp" size={18} color={ACCENT} />
+              <Text style={styles.cityName} numberOfLines={1}>
+                {cityName || 'Your Location'}
               </Text>
-            </View>
-          </TouchableOpacity>
-          <View style={styles.legendSlot} pointerEvents="none">
-            <RadarLegend layer={activeLayer} />
+              <Ionicons name="chevron-down" size={14} color={TEXT_TERTIARY} />
+            </TouchableOpacity>
+            {/* Map / Globe toggle */}
+            <TouchableOpacity
+              style={styles.viewToggle}
+              onPress={() => {
+                setViewMode(viewMode === 'map' ? 'globe' : 'map')
+                setLayerMenuOpen(false)
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={viewMode === 'map' ? 'earth' : 'map-outline'}
+                size={18}
+                color={viewMode === 'globe' ? ACCENT : TEXT_SECONDARY}
+              />
+            </TouchableOpacity>
           </View>
+          {viewMode === 'map' && (
+            <View style={styles.legendSlot} pointerEvents="none">
+              <RadarLegend layer={activeLayer} />
+            </View>
+          )}
         </View>
       </SafeAreaView>
 
+      {/* Dismiss dropdown when tapping the map */}
+      {isLayerMenuOpen && (
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={() => setLayerMenuOpen(false)}
+        />
+      )}
+
       <View style={[styles.bottomOverlay, { paddingBottom: bottomPad }]} pointerEvents="box-none">
-        <View style={styles.layerPill} pointerEvents="auto">
-          {LAYERS.map((layer) => {
-            const isActive = layer.key === activeLayer
-            return (
-              <Pressable
-                key={layer.key}
-                style={[
-                  styles.layerBtn,
-                  isActive && styles.layerBtnActive,
-                  isActive && { borderColor: layer.color },
-                ]}
-                onPress={() => {
-                  setActiveLayer(layer.key)
-                  setIsPlaying(true)
-                  setFrameIndex(0)
-                  setTotalFrames(0)
-                }}
-              >
-                <Ionicons
-                  name={layer.icon}
-                  size={20}
-                  color={isActive ? layer.color : TEXT_SECONDARY}
-                />
-                <Text style={[styles.layerBtnLabel, isActive && { color: layer.color }]}>
-                  {layer.label}
-                </Text>
-              </Pressable>
-            )
-          })}
+        {/* ── Floating layer selector ───────────────────────────── */}
+        <View style={styles.layerRow} pointerEvents="auto">
+          <View style={styles.layerDropdownContainer}>
+            {isLayerMenuOpen && (
+              <View style={styles.layerMenu}>
+                {LAYERS.map((layer) => {
+                  const isActive = layer.key === activeLayer
+                  return (
+                    <Pressable
+                      key={layer.key}
+                      style={[styles.layerMenuItem, isActive && styles.layerMenuItemActive]}
+                      onPress={() => {
+                        setActiveLayer(layer.key)
+                        setLayerMenuOpen(false)
+                        setIsPlaying(true)
+                        setFrameIndex(0)
+                        setTotalFrames(0)
+                      }}
+                    >
+                      <Ionicons
+                        name={layer.icon}
+                        size={18}
+                        color={isActive ? layer.color : TEXT_SECONDARY}
+                      />
+                      <Text style={[styles.layerMenuLabel, isActive && { color: layer.color }]}>
+                        {layer.label}
+                      </Text>
+                      <View style={styles.layerMenuCheck}>
+                        {isActive && <Ionicons name="checkmark" size={16} color={layer.color} />}
+                      </View>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.layerTrigger}
+              onPress={() => setLayerMenuOpen(!isLayerMenuOpen)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name={activeConfig.icon} size={16} color={activeConfig.color} />
+              <Text style={[styles.layerTriggerLabel, { color: activeConfig.color }]}>
+                {activeConfig.label}
+              </Text>
+              <Ionicons
+                name={isLayerMenuOpen ? 'chevron-up' : 'chevron-down'}
+                size={13}
+                color={TEXT_TERTIARY}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {activeLayer !== 'temperature' && activeLayer !== 'air' && (
+        {viewMode === 'map' && activeLayer !== 'temperature' && activeLayer !== 'air' && (
           <View style={styles.timelineCard} pointerEvents="auto">
             <View style={styles.timelineTopRow}>
               <TouchableOpacity
@@ -338,6 +401,11 @@ const styles = StyleSheet.create({
     gap: 10,
     alignSelf: 'stretch',
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   topPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -346,9 +414,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: RADAR_FLOAT_SURFACE,
     borderRadius: 22,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: RADAR_FLOAT_BORDER,
-    alignSelf: 'stretch',
+    flex: 1,
+  },
+  viewToggle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: RADAR_FLOAT_SURFACE,
+    borderWidth: 1,
+    borderColor: RADAR_FLOAT_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cityName: {
     ...FONT_BOLD,
@@ -364,7 +442,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(220, 165, 60, 0.1)',
   },
   layerBadgeText: {
     fontSize: 10,
@@ -388,7 +466,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: RADAR_FLOAT_SURFACE,
     borderRadius: 22,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: RADAR_FLOAT_BORDER,
   },
   timelineTopRow: {
@@ -424,34 +502,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: ACCENT_SOFT,
   },
-  layerPill: {
+  layerRow: {
     flexDirection: 'row',
-    marginHorizontal: 16,
-    padding: 8,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+  },
+  layerDropdownContainer: {
+    alignItems: 'flex-end',
+  },
+  layerMenu: {
     backgroundColor: RADAR_FLOAT_SURFACE,
-    borderRadius: 22,
-    borderWidth: 1.5,
+    borderRadius: 18,
+    borderWidth: 1,
     borderColor: RADAR_FLOAT_BORDER,
-    gap: 6,
+    overflow: 'hidden',
+    marginBottom: 8,
+    minWidth: 180,
   },
-  layerBtn: {
-    flex: 1,
+  layerMenuItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 16,
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderColor: 'rgba(222, 225, 247, 0.2)',
-    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(220, 165, 60, 0.08)',
   },
-  layerBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  layerMenuItemActive: {
+    backgroundColor: 'rgba(220, 165, 60, 0.08)',
   },
-  layerBtnLabel: {
-    ...FONT_MEDIUM,
-    fontSize: 10,
+  layerMenuLabel: {
+    ...FONT_BOLD,
+    fontSize: 14,
     color: TEXT_SECONDARY,
-    letterSpacing: 0.3,
+    flex: 1,
+  },
+  layerMenuCheck: {
+    width: 20,
+    alignItems: 'center',
+  },
+  layerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: RADAR_FLOAT_SURFACE,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: RADAR_FLOAT_BORDER,
+  },
+  layerTriggerLabel: {
+    ...FONT_BOLD,
+    fontSize: 13,
   },
   playButtonDisabled: {
     opacity: 0.55,

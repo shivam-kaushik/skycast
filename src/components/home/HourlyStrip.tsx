@@ -266,7 +266,7 @@ function PrecipColumn({ slot, hourly }: { slot: TimelineSlot; hourly: HourlyWeat
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: GHOST_BORDER,
     backgroundColor: GLASS_BG,

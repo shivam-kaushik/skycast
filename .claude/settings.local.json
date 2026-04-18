@@ -14,7 +14,8 @@
       "Bash(taskkill:*)",
       "Bash(eas whoami:*)",
       "Bash(npx eas:*)",
-      "Bash(claude plugin:*)"
+      "Bash(claude plugin:*)",
+      "WebSearch"
     ]
   }
 }
