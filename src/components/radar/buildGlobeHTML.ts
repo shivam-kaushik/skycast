@@ -127,6 +127,49 @@ export function buildGlobeHTML(
     .labelColor(function() { return accent; })
     .labelResolution(3);
 
+  // ── Temperature heatmap (layer === temperature) ────────────────────────────
+  if (D.layer === 'temperature') {
+    var tempPoints = [];
+    var tempC = D.temp;
+    var tempNorm = Math.min(Math.max((tempC + 20) / 60, 0), 1);
+    var rLat, rLon;
+    for (rLat = -35; rLat <= 35; rLat += 5) {
+      for (rLon = -35; rLon <= 35; rLon += 5) {
+        var dist = Math.sqrt(rLat * rLat + rLon * rLon) / 35;
+        var w = Math.max(0, 1 - dist * dist) * 0.8 + 0.2;
+        tempPoints.push({ lat: D.lat + rLat, lng: D.lon + rLon, weight: w });
+      }
+    }
+    globe
+      .heatmapsData([tempPoints])
+      .heatmapPointLat(function(d) { return d.lat; })
+      .heatmapPointLng(function(d) { return d.lng; })
+      .heatmapPointWeight(function(d) { return d.weight; })
+      .heatmapBandwidth(0.92)
+      .heatmapColorFn(function(t) {
+        var combined = t * tempNorm;
+        var r, g, b;
+        if (combined < 0.33) {
+          r = Math.round(74 + combined * 3 * 181);
+          g = Math.round(158 + combined * 3 * -58);
+          b = 255;
+        } else if (combined < 0.66) {
+          var frac = (combined - 0.33) / 0.33;
+          r = 255;
+          g = Math.round(100 + frac * 66);
+          b = Math.round(255 - frac * 220);
+        } else {
+          var frac2 = (combined - 0.66) / 0.34;
+          r = 255;
+          g = Math.round(166 - frac2 * 59);
+          b = Math.round(35 - frac2 * 35);
+        }
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + (t * 0.8) + ')';
+      });
+  }
+
+  // ── Air quality heatmap — added in next task
+
   // ── On globe ready: add cloud shell + notify RN ───────────────────────────
   globe.onGlobeReady(function() {
     // Fade out loader
