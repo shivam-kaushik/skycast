@@ -15,7 +15,10 @@
       "Bash(eas whoami:*)",
       "Bash(npx eas:*)",
       "Bash(claude plugin:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:www.rainviewer.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
