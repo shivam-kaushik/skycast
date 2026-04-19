@@ -168,7 +168,35 @@ export function buildGlobeHTML(
       });
   }
 
-  // ── Air quality heatmap — added in next task
+  // ── Air quality heatmap (layer === air) ────────────────────────────────────
+  if (D.layer === 'air') {
+    var aqiPoints = [];
+    var aqi = D.aqi;
+    var aqiNorm = Math.min(aqi / 200, 1);
+    var aLat, aLon;
+    for (aLat = -30; aLat <= 30; aLat += 5) {
+      for (aLon = -30; aLon <= 30; aLon += 5) {
+        var aDist = Math.sqrt(aLat * aLat + aLon * aLon) / 30;
+        var aW = Math.max(0, 1 - aDist * aDist) * 0.75 + 0.25;
+        aqiPoints.push({ lat: D.lat + aLat, lng: D.lon + aLon, weight: aW });
+      }
+    }
+    globe
+      .heatmapsData([aqiPoints])
+      .heatmapPointLat(function(d) { return d.lat; })
+      .heatmapPointLng(function(d) { return d.lng; })
+      .heatmapPointWeight(function(d) { return d.weight; })
+      .heatmapBandwidth(0.88)
+      .heatmapColorFn(function(t) {
+        var combined = t * aqiNorm;
+        var r, g, b;
+        if (combined < 0.25)      { r = 6;   g = 214; b = 160; }
+        else if (combined < 0.5)  { r = 255; g = 209; b = 102; }
+        else if (combined < 0.75) { r = 255; g = 149; b = 0;   }
+        else                      { r = 255; g = 107; b = 107; }
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + (t * 0.82) + ')';
+      });
+  }
 
   // ── On globe ready: add cloud shell + notify RN ───────────────────────────
   globe.onGlobeReady(function() {
