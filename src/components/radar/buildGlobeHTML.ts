@@ -227,10 +227,14 @@ export function buildGlobeHTML(
             })
           );
           scene.add(cloudMesh);
-          (function spinCloud() {
+          var cloudAnimating = true;
+          window.addEventListener('unload', function() { cloudAnimating = false; });
+          var spinCloud = function spinCloud() {
+            if (!cloudAnimating) return;
             cloudMesh.rotation.y += 0.00022;
             requestAnimationFrame(spinCloud);
-          })();
+          };
+          spinCloud();
         }
       );
     } catch (_) {
@@ -276,8 +280,8 @@ export function buildGlobeHTML(
             frames.forEach(function(f, i) {
               var url = host + f.path + '/512/0/0/0/2/1_1.png';
               texLoader.load(url, function(tex) {
-                tex.wrapS = THREE.RepeatWrapping;
-                tex.wrapT = THREE.RepeatWrapping;
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
                 textures[i] = tex;
                 loaded++;
                 succeeded++;
@@ -298,8 +302,8 @@ export function buildGlobeHTML(
         var WIND_RAD = D.windDir * Math.PI / 180;
 
         // Surface tangent vector from wind direction (bearing = "from" direction)
-        var windLat = Math.sin(-WIND_RAD) * WIND_SPEED_NORM * 0.6;
-        var windLon = Math.cos(-WIND_RAD) * WIND_SPEED_NORM;
+        var windLat = Math.cos(WIND_RAD) * WIND_SPEED_NORM * 0.6;
+        var windLon = Math.sin(WIND_RAD) * WIND_SPEED_NORM;
 
         var pPositions = new Float32Array(PARTICLE_COUNT * 3);
         var pPhases = new Float32Array(PARTICLE_COUNT);
