@@ -187,7 +187,7 @@ export function buildMapHTML(
   var CLOUD_VALID_TIMES_COUNT = ${params.cloudValidTimesLength};
   var WIND_VECTOR_SOURCE_URL = ${params.windVectorSourceUrl ? `'${params.windVectorSourceUrl}'` : 'null'};
   var WIND_VECTOR_VALID_TIMES_COUNT = ${params.windVectorValidTimesLength ?? params.tileValidTimesLength};
-  var MAX_FRAMES = 8;
+  var MAX_FRAMES = 4;
   var OM_MAX_NATIVE_ZOOM = 12;
   var FRAME_INDICES = ${JSON.stringify(params.frameIndices)};
   var CLOUD_FRAME_INDICES = ${JSON.stringify(params.cloudFrameIndices)};
@@ -683,11 +683,11 @@ function buildOmFileUrl(
 
 /**
  * Total animated tile layers budget.
- * WASM heap OOM observed at 10+ concurrent layers. Keep to 8 max total:
- * With cloud overlay: 4 precip + 4 cloud = 8 layers (safe margin below OOM threshold).
- * Without cloud overlay: up to 8 precipitation frames for the 12-hour window.
+ * WASM heap OOM observed at 10+ concurrent layers. Keep to 4 max total:
+ * With cloud overlay: 2 precip + 2 cloud = 4 layers (safe margin below OOM threshold).
+ * Without cloud overlay: up to 4 precipitation frames for the 12-hour window.
  */
-const MAX_MAP_FRAMES = 8
+const MAX_MAP_FRAMES = 4
 
 function injectSeekScript(index: number): string {
   const payload = JSON.stringify({ type: 'seek', index })
