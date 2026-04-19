@@ -14,8 +14,8 @@ export function homeScrimGradient(kind: AmbientVisualKind): {
     case 'rain':
     case 'thunder':
       return {
-        colors: ['rgba(14,19,34,0.22)', 'rgba(14,19,34,0.52)', 'rgba(14,19,34,0.88)', BG],
-        locations: [0, 0.34, 0.68, 1],
+        colors: ['rgba(8,14,24,0.12)', 'rgba(8,14,24,0.40)', 'rgba(8,14,24,0.80)', BG],
+        locations: [0, 0.32, 0.66, 1],
       }
     case 'clearNight':
       return {

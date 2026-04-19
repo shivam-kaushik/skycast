@@ -75,14 +75,26 @@ export function isDaytimeFromSun(sunriseIso: string, sunsetIso: string, now: Dat
 }
 
 /**
- * Map WMO weather code (+ day/night) to ambient visuals (Apple/Samsung-style hero backgrounds).
+ * Map WMO weather code (+ day/night + precip probability) to ambient visuals.
+ *
+ * `precipPct` is the current precipitation probability (0–100).  When the WMO code
+ * says overcast (3) but precipitation is already high, we treat the visual as rain
+ * so the background reacts correctly to real-world conditions.
  */
-export function getAmbientVisualKind(weatherCode: number, isDay: boolean): AmbientVisualKind {
+export function getAmbientVisualKind(
+  weatherCode: number,
+  isDay: boolean,
+  precipPct = 0,
+): AmbientVisualKind {
   if (THUNDER_CODES.has(weatherCode)) return 'thunder'
   if (SNOW_CODES.has(weatherCode)) return 'snow'
   if (RAIN_CODES.has(weatherCode)) return 'rain'
   if (FOG_CODES.has(weatherCode)) return 'fog'
-  if (weatherCode === 3) return 'cloudy'
+  if (weatherCode === 3) {
+    // Overcast + high precipitation probability → show rain visuals
+    if (precipPct >= 55) return 'rain'
+    return 'cloudy'
+  }
   if (weatherCode === 2) return isDay ? 'partlyCloudyDay' : 'partlyCloudyNight'
   if (weatherCode === 0 || weatherCode === 1) return isDay ? 'clearDay' : 'clearNight'
   return isDay ? 'partlyCloudyDay' : 'partlyCloudyNight'

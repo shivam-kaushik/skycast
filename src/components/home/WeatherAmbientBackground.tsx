@@ -50,7 +50,7 @@ const GRADIENTS: Record<AmbientVisualKind, readonly [string, string, ...string[]
   partlyCloudyDay:    ['#2563a8', '#4a7eb8', '#6fa0cc', '#9bc0e0'],
   partlyCloudyNight:  ['#0a1524', '#1a2838', '#2a3848', '#3a4858'],
   cloudy:             ['#2a3444', '#3d4a5c', '#4e5d72'],
-  rain:               ['#141e2a', '#1f2d3d', '#2c3c50'],
+  rain:               ['#080e18', '#0e1a2c', '#152438', '#0c1420'],
   snow:               ['#283548', '#3a4a62', '#506078'],
   fog:                ['#3e4654', '#4e5664', '#5e6674'],
   thunder:            ['#0c0614', '#1a1428', '#261e38'],
@@ -606,7 +606,10 @@ function WeatherAmbientBackgroundComponent({
 }: WeatherAmbientBackgroundProps) {
   const { height: winH } = useWindowDimensions()
 
-  const kind = useMemo(() => getAmbientVisualKind(weatherCode, isDay), [weatherCode, isDay])
+  const kind = useMemo(
+    () => getAmbientVisualKind(weatherCode, isDay, precipitationProbability),
+    [weatherCode, isDay, precipitationProbability],
+  )
   const phase = useMemo(() => getTimePhase(sunrise, sunset), [sunrise, sunset])
 
   const gradColors = useMemo(() => buildGradient(kind, phase), [kind, phase])
@@ -616,8 +619,12 @@ function WeatherAmbientBackgroundComponent({
 
   const precipSignal = Math.max(precipitationProbability, hourlyPrecipitationMax)
   const overcastRainLayerOpacity = rainOpacityForOvercast(precipSignal)
+  // Show rain particles on overcast when either the hourly forecast has rain codes
+  // OR the current precipitation probability is already high (≥ 45%).
   const showOvercastRain =
-    kind === 'cloudy' && hourlyForecastHasRainish && overcastRainLayerOpacity > 0
+    kind === 'cloudy' &&
+    overcastRainLayerOpacity > 0 &&
+    (hourlyForecastHasRainish || precipitationProbability >= 45)
 
   // Horizon glow for golden-hour conditions on clear/partly-cloudy days
   const showHorizonGlow =

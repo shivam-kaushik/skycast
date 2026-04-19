@@ -119,7 +119,7 @@ export default function HomeScreen() {
   const sunrise = daily.sunrise[0] ?? ''
   const sunset = daily.sunset[0] ?? ''
   const isDay = isDaytimeFromSun(sunrise, sunset)
-  const ambientKind = getAmbientVisualKind(current.weatherCode, isDay)
+  const ambientKind = getAmbientVisualKind(current.weatherCode, isDay, current.precipitationProbability)
   const scrim = homeScrimGradient(ambientKind)
   const hourlyPrecipMax12h = maxPrecipitationProbabilityNextHours(hourly, 12)
   const hourlyForecastHasRainish = hasRainishHourlyInNextHours(hourly, 12)
