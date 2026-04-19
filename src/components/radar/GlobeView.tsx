@@ -33,6 +33,8 @@ export default function GlobeView({ lat, lon, layer, weather }: GlobeViewProps) 
         domStorageEnabled
         allowFileAccess
         allowUniversalAccessFromFileURLs
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
         scrollEnabled={false}
         bounces={false}
         showsHorizontalScrollIndicator={false}
