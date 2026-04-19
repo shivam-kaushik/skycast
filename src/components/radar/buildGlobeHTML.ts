@@ -213,6 +213,71 @@ export function buildGlobeHTML(
           })
           .catch(function() {});
       }
+
+      if (D.layer === 'wind') {
+        // Wind particle system — particles on sphere surface, moving in wind direction
+        var PARTICLE_COUNT = 3500;
+        var WIND_SPEED_NORM = Math.min(Math.max(D.wind / 100, 0.005), 0.04);
+        var WIND_RAD = D.windDir * Math.PI / 180;
+
+        // Surface tangent vector from wind direction (bearing = "from" direction)
+        var windLat = Math.sin(-WIND_RAD) * WIND_SPEED_NORM * 0.6;
+        var windLon = Math.cos(-WIND_RAD) * WIND_SPEED_NORM;
+
+        var pPositions = new Float32Array(PARTICLE_COUNT * 3);
+        var pPhases = new Float32Array(PARTICLE_COUNT);
+        var pLats = new Float32Array(PARTICLE_COUNT);
+        var pLons = new Float32Array(PARTICLE_COUNT);
+        var PR = GLOBE_R * 1.013;
+
+        var initParticle = function initParticle(i) {
+          pLats[i] = (D.lat + (Math.random() - 0.5) * 80) * Math.PI / 180;
+          pLons[i] = (D.lon + (Math.random() - 0.5) * 80) * Math.PI / 180;
+          pPhases[i] = Math.random();
+        };
+        var latlonToXYZ = function latlonToXYZ(latR, lonR) {
+          return {
+            x: PR * Math.cos(latR) * Math.cos(lonR),
+            y: PR * Math.sin(latR),
+            z: PR * Math.cos(latR) * Math.sin(-lonR)
+          };
+        };
+
+        for (var pi = 0; pi < PARTICLE_COUNT; pi++) initParticle(pi);
+
+        var pgeo = new THREE.BufferGeometry();
+        pgeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+        var pmat = new THREE.PointsMaterial({
+          size: 0.55,
+          color: 0x23b9a1,
+          transparent: true,
+          opacity: 0.72,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        var particles = new THREE.Points(pgeo, pmat);
+        SCENE.add(particles);
+
+        var windAnimating = true;
+        window.addEventListener('unload', function() { windAnimating = false; });
+
+        var animateWind = function animateWind() {
+          if (!windAnimating) return;
+          requestAnimationFrame(animateWind);
+          for (var wi = 0; wi < PARTICLE_COUNT; wi++) {
+            pPhases[wi] += 0.004;
+            if (pPhases[wi] > 1) { pPhases[wi] = 0; initParticle(wi); }
+            pLats[wi] += windLat * 0.3;
+            pLons[wi] += windLon * 0.3;
+            var pos = latlonToXYZ(pLats[wi], pLons[wi]);
+            pPositions[wi * 3]     = pos.x;
+            pPositions[wi * 3 + 1] = pos.y;
+            pPositions[wi * 3 + 2] = pos.z;
+          }
+          pgeo.attributes.position.needsUpdate = true;
+        };
+        animateWind();
+      }
     } catch (_) {}
 
     try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' })); } catch (_) {}
