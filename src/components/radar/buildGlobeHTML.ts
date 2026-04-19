@@ -88,10 +88,16 @@ export function buildGlobeHTML(
   }
 
   var accent =
-    D.layer === 'wind'          ? '#7bbfff' :
+    D.layer === 'wind'          ? '#23b9a1' :
     D.layer === 'air'           ? '#06D6A0' :
-    D.layer === 'precipitation' ? '#a8d8ff' :
+    D.layer === 'precipitation' ? '#4a9eff' :
     tempAccent(D.temp);
+
+  var atmosphereAlt =
+    D.layer === 'precipitation' ? 0.22 :
+    D.layer === 'wind'          ? 0.14 :
+    D.layer === 'air'           ? 0.16 :
+    0.18;
 
   var labelValue =
     D.layer === 'temperature'   ? (D.temp + '\\u00b0') :
@@ -107,7 +113,7 @@ export function buildGlobeHTML(
     .backgroundImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png')
     .showAtmosphere(true)
     .atmosphereColor(accent)
-    .atmosphereAltitude(0.18)
+    .atmosphereAltitude(atmosphereAlt)
     .showGraticules(false);
 
   // ── Pulsing ring at user location ──────────────────────────────────────────
