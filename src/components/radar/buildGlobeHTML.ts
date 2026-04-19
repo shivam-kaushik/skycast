@@ -166,38 +166,49 @@ export function buildGlobeHTML(
       var GLOBE_R = globe.getGlobeRadius ? globe.getGlobeRadius() : 100;
 
       if (D.layer === 'precipitation') {
-        fetch('https://api.rainviewer.com/public/weather-maps.json')
+        var rvCtrl = new AbortController();
+        setTimeout(function() { rvCtrl.abort(); }, 8000);
+        fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: rvCtrl.signal })
           .then(function(r) { return r.json(); })
           .then(function(data) {
             var host = data.host;
             var frames = (data.radar && data.radar.past ? data.radar.past : []).slice(-6);
             if (frames.length === 0) return;
-            var loader = new THREE.TextureLoader();
-            loader.crossOrigin = 'anonymous';
+            var texLoader = new THREE.TextureLoader();
+            texLoader.crossOrigin = 'anonymous';
             var textures = [];
             var loaded = 0;
+            var succeeded = 0;
+            var animating = true;
+            window.addEventListener('unload', function() { animating = false; });
             var geo = new THREE.SphereGeometry(GLOBE_R * 1.009, 64, 64);
             var mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
             var precipMesh = new THREE.Mesh(geo, mat);
             SCENE.add(precipMesh);
+            var fi = 0;
+            var nextPrecipFrame = function nextPrecipFrame() {
+              if (!animating) return;
+              if (textures[fi]) { mat.map = textures[fi]; mat.needsUpdate = true; }
+              fi = (fi + 1) % frames.length;
+              setTimeout(nextPrecipFrame, 700);
+            };
+            var startAnimation = function() {
+              mat.opacity = 0.75;
+              nextPrecipFrame();
+            };
             frames.forEach(function(f, i) {
               var url = host + f.path + '/512/0/0/0/2/1_1.png';
-              loader.load(url, function(tex) {
+              texLoader.load(url, function(tex) {
                 tex.wrapS = THREE.RepeatWrapping;
                 tex.wrapT = THREE.RepeatWrapping;
                 textures[i] = tex;
                 loaded++;
-                if (loaded === frames.length) {
-                  mat.opacity = 0.75;
-                  var fi = 0;
-                  function nextPrecipFrame() {
-                    if (textures[fi]) { mat.map = textures[fi]; mat.needsUpdate = true; }
-                    fi = (fi + 1) % frames.length;
-                    setTimeout(nextPrecipFrame, 700);
-                  }
-                  nextPrecipFrame();
-                }
-              }, undefined, function() { loaded++; });
+                succeeded++;
+                if (loaded === frames.length && succeeded > 0) { startAnimation(); }
+              }, undefined, function() {
+                loaded++;
+                if (loaded === frames.length && succeeded > 0) { startAnimation(); }
+              });
             });
           })
           .catch(function() {});
