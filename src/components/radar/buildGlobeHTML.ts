@@ -160,6 +160,50 @@ export function buildGlobeHTML(
       // Cloud shell failed — globe still renders without it
     }
 
+    // ── Layer-specific overlays ────────────────────────────────────────────────
+    try {
+      var SCENE = globe.scene();
+      var GLOBE_R = globe.getGlobeRadius ? globe.getGlobeRadius() : 100;
+
+      if (D.layer === 'precipitation') {
+        fetch('https://api.rainviewer.com/public/weather-maps.json')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var host = data.host;
+            var frames = (data.radar && data.radar.past ? data.radar.past : []).slice(-6);
+            if (frames.length === 0) return;
+            var loader = new THREE.TextureLoader();
+            loader.crossOrigin = 'anonymous';
+            var textures = [];
+            var loaded = 0;
+            var geo = new THREE.SphereGeometry(GLOBE_R * 1.009, 64, 64);
+            var mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+            var precipMesh = new THREE.Mesh(geo, mat);
+            SCENE.add(precipMesh);
+            frames.forEach(function(f, i) {
+              var url = host + f.path + '/512/0/0/0/2/1_1.png';
+              loader.load(url, function(tex) {
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                textures[i] = tex;
+                loaded++;
+                if (loaded === frames.length) {
+                  mat.opacity = 0.75;
+                  var fi = 0;
+                  function nextPrecipFrame() {
+                    if (textures[fi]) { mat.map = textures[fi]; mat.needsUpdate = true; }
+                    fi = (fi + 1) % frames.length;
+                    setTimeout(nextPrecipFrame, 700);
+                  }
+                  nextPrecipFrame();
+                }
+              }, undefined, function() { loaded++; });
+            });
+          })
+          .catch(function() {});
+      }
+    } catch (_) {}
+
     try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' })); } catch (_) {}
   });
 
