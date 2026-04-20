@@ -8,10 +8,10 @@ export function detectPressureAlert(
   fromIndex: number,
 ): PressureAlertData {
   const windowHours = 3
-  const lookAhead = 3
+  const lookAhead = 12
   const end = Math.min(fromIndex + lookAhead, surfacePressureHourly.length - windowHours)
 
-  for (let i = fromIndex; i <= end; i++) {
+  for (let i = fromIndex; i < end; i++) {
     const start = surfacePressureHourly[i] ?? 0
     const later = surfacePressureHourly[i + windowHours] ?? 0
     const delta = later - start

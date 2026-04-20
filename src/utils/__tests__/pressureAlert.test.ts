@@ -23,8 +23,11 @@ describe('detectPressureAlert', () => {
   })
 
   it('respects fromIndex offset', () => {
-    const pressure = [1013, 1013, 1013, 1013, 1013, 1010, 1007, 1004, 1002]
+    // 13 stable hours then an 11 hPa drop over 3 hours at index 13
+    // fromIndex=0: scans i=0..8 (all stable) → no alert
+    // fromIndex=12: scans starting at i=12; at i=12 pressure[12]=1013, pressure[15]=1002 → -11 → alert
+    const pressure = [...Array(13).fill(1013), 1013, 1010, 1007, 1002, 1001, 1000]
     expect(detectPressureAlert(pressure, 0).alert).toBe(false)
-    expect(detectPressureAlert(pressure, 2).alert).toBe(true)
+    expect(detectPressureAlert(pressure, 12).alert).toBe(true)
   })
 })
