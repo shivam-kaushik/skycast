@@ -128,7 +128,7 @@ export default function LocationPickerModal({
         >
           <View style={styles.headerRow}>
             <Text style={styles.title}>Locations</Text>
-            <Pressable style={styles.closeBtn} onPress={onClose}>
+            <Pressable testID="location-picker-close" style={styles.closeBtn} onPress={onClose}>
               <Ionicons name="close" size={18} color={TEXT_SECONDARY} />
             </Pressable>
           </View>
@@ -137,6 +137,7 @@ export default function LocationPickerModal({
             <View style={styles.searchRow}>
               <Ionicons name="search-outline" size={16} color={TEXT_TERTIARY} />
               <TextInput
+                testID="location-picker-search"
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Search city or place"

@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocationStore } from '@/src/store/locationStore'
 import { usePrefsStore } from '@/src/store/prefsStore'
 import { useWeather } from '@/src/hooks/useWeather'
-import { useLocation } from '@/src/hooks/useLocation'
 import DailyBriefCard from '@/src/components/home/DailyBriefCard'
 import WeatherAmbientBackground from '@/src/components/home/WeatherAmbientBackground'
 import HourlyStrip from '@/src/components/home/HourlyStrip'
@@ -57,7 +56,9 @@ export default function HomeScreen() {
   const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
   const useDeviceLocation = useLocationStore((s) => s.useDeviceLocation)
   const toggleFavorite = useLocationStore((s) => s.toggleFavorite)
-  const { loading: locationLoading, error: locationError, permissionDenied } = useLocation()
+  const locationLoading = useLocationStore((s) => s.locationLoading)
+  const locationError = useLocationStore((s) => s.locationError)
+  const permissionDenied = useLocationStore((s) => s.locationPermissionDenied)
   const unit = usePrefsStore((s) => s.unit)
   const setUnit = usePrefsStore((s) => s.setUnit)
   const [isPickerOpen, setPickerOpen] = useState(false)
@@ -152,12 +153,18 @@ export default function HomeScreen() {
         >
           {/* ── Minimal header ──────────────────────────────────────── */}
           <View style={styles.header}>
-            <TouchableOpacity style={styles.locationBtn} onPress={() => setPickerOpen(true)} activeOpacity={0.85}>
+            <TouchableOpacity
+              testID="home-location-trigger"
+              style={styles.locationBtn}
+              onPress={() => setPickerOpen(true)}
+              activeOpacity={0.85}
+            >
               <Ionicons name="location-sharp" size={14} color={ACCENT} />
               <Text style={styles.locationText} numberOfLines={1}>{cityName || 'Your Location'}</Text>
               <Ionicons name="chevron-down" size={13} color={TEXT_TERTIARY} />
             </TouchableOpacity>
             <TouchableOpacity
+              testID="home-unit-toggle"
               onPress={() => setUnit(unit === 'C' ? 'F' : 'C')}
               style={styles.unitPill}
               activeOpacity={0.8}

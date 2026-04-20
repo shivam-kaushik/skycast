@@ -18,7 +18,6 @@ import { usePrefsStore } from '@/src/store/prefsStore'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useEra5History } from '@/src/hooks/useEra5History'
-import { useLocation } from '@/src/hooks/useLocation'
 import GlassCard from '@/src/components/shared/GlassCard'
 import SectionLabel from '@/src/components/shared/SectionLabel'
 import HistoryBriefCard from '@/src/components/more/HistoryBriefCard'
@@ -103,7 +102,6 @@ interface HealthTile {
 }
 
 export default function MoreScreen() {
-  useLocation()
   const { lat, lon, cityName } = useLocationStore()
   const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
   const { data: airQuality } = useAirQuality(lat, lon)

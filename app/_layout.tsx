@@ -1,3 +1,4 @@
+import '@/src/e2e/bootstrapWebE2e'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, ThemeProvider } from '@react-navigation/native'
 import { useFonts } from 'expo-font'
@@ -5,6 +6,7 @@ import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useLocation } from '@/src/hooks/useLocation'
 import 'react-native-reanimated'
 
 export { ErrorBoundary } from 'expo-router'
@@ -16,6 +18,11 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync()
 
 const queryClient = new QueryClient()
+
+function LocationBootstrap(): null {
+  useLocation()
+  return null
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -40,6 +47,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <LocationBootstrap />
       <ThemeProvider value={DarkTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

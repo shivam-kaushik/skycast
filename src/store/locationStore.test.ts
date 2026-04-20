@@ -10,6 +10,9 @@ describe('locationStore', () => {
       deviceLon: null,
       deviceCityName: '',
       isManualSelection: false,
+      locationLoading: false,
+      locationError: null,
+      locationPermissionDenied: false,
       savedLocations: [],
       recentLocationIds: [],
     })
@@ -39,6 +42,9 @@ describe('locationStore', () => {
       deviceLon: null,
       deviceCityName: '',
       isManualSelection: false,
+      locationLoading: false,
+      locationError: null,
+      locationPermissionDenied: false,
       savedLocations: [],
       recentLocationIds: [],
     })
@@ -67,6 +73,9 @@ describe('locationStore', () => {
       deviceLon: -79.38,
       deviceCityName: 'Toronto',
       isManualSelection: true,
+      locationLoading: false,
+      locationError: null,
+      locationPermissionDenied: false,
       savedLocations: [],
       recentLocationIds: [],
     })

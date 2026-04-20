@@ -17,7 +17,6 @@ import { useLocationStore } from '@/src/store/locationStore'
 import { usePrefsStore } from '@/src/store/prefsStore'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useWeather } from '@/src/hooks/useWeather'
-import { useLocation } from '@/src/hooks/useLocation'
 import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 import AQIGauge from '@/src/components/air/AQIGauge'
 import PollenBars from '@/src/components/air/PollenBars'
@@ -60,7 +59,6 @@ const MAP_IMAGE =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDVpDRdzSjcCinT_FW_UgJKPTxpL3zR7ku1nEKlkwv742tTqbbnYR7n_En-gSTVYIxQM7iFGloW37BchWr-g2_LskXYhLZbho_relsy-H0V1KPS9a45-wiJ9TQV8zyWKwmpXhmNfStbAAAlO3oZxxnfZ_LxdFgM6v8CJdEvphn9VupTsuN72QKr4gN5LzP6zx1rZBsg0zNElm3xLMVUxpa7Z5njT9Pfmah9rPl8FTcdqITHK13g4bmeMxzBtf4XEDw00LKJ_WrXtsk'
 
 export default function AirScreen() {
-  useLocation()
   const router = useRouter()
   const unit = usePrefsStore((s) => s.unit)
   const { lat, lon, cityName, deviceCityName, savedLocations, recentLocationIds } =
@@ -183,7 +181,7 @@ export default function AirScreen() {
                 colors={['transparent', BG]}
                 style={StyleSheet.absoluteFillObject}
               />
-              <Pressable style={styles.mapBtn} onPress={() => router.push('/radar')}>
+              <Pressable testID="air-nav-radar-button" style={styles.mapBtn} onPress={() => router.push('/radar')}>
                 <Ionicons name="map-outline" size={18} color={ON_PRIMARY} />
                 <Text style={styles.mapBtnText}>View Air Quality Map</Text>
               </Pressable>

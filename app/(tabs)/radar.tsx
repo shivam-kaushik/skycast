@@ -17,7 +17,6 @@ import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { useLocationStore } from '@/src/store/locationStore'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
-import { useLocation } from '@/src/hooks/useLocation'
 import WeatherMapView from '@/src/components/radar/WeatherMapView'
 import type { MapLayer, WeatherMapHandle } from '@/src/components/radar/WeatherMapView'
 import GlobeView from '@/src/components/radar/GlobeView'
@@ -91,7 +90,6 @@ function formatHeroTime(iso: string | null): string {
 }
 
 export default function RadarScreen() {
-  useLocation()
   const insets = useSafeAreaInsets()
   const { lat, lon, cityName, deviceCityName, savedLocations, recentLocationIds } =
     useLocationStore()
@@ -215,7 +213,12 @@ export default function RadarScreen() {
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topColumn} pointerEvents="box-none">
           <View style={styles.topRow} pointerEvents="auto">
-            <TouchableOpacity style={styles.topPill} onPress={() => setPickerOpen(true)} activeOpacity={0.9}>
+            <TouchableOpacity
+              testID="radar-location-trigger"
+              style={styles.topPill}
+              onPress={() => setPickerOpen(true)}
+              activeOpacity={0.9}
+            >
               <Ionicons name="location-sharp" size={18} color={ACCENT} />
               <Text style={styles.cityName} numberOfLines={1}>
                 {cityName || 'Your Location'}
@@ -224,6 +227,7 @@ export default function RadarScreen() {
             </TouchableOpacity>
             {/* Map / Globe toggle */}
             <TouchableOpacity
+              testID="radar-view-toggle"
               style={styles.viewToggle}
               onPress={() => {
                 setViewMode(viewMode === 'map' ? 'globe' : 'map')
@@ -291,6 +295,7 @@ export default function RadarScreen() {
               </View>
             )}
             <TouchableOpacity
+              testID="radar-layer-trigger"
               style={styles.layerTrigger}
               onPress={() => setLayerMenuOpen(!isLayerMenuOpen)}
               activeOpacity={0.85}

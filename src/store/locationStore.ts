@@ -33,6 +33,10 @@ interface LocationStore {
   deviceLon: number | null
   deviceCityName: string
   isManualSelection: boolean
+  /** Device GPS / permission flow — driven by `useLocation()` in tab layout (single instance). */
+  locationLoading: boolean
+  locationError: string | null
+  locationPermissionDenied: boolean
   savedLocations: SavedLocation[]
   recentLocationIds: string[]
   setLocation: (lat: number, lon: number, cityName: string) => void
@@ -40,6 +44,11 @@ interface LocationStore {
   selectManualLocation: (location: Omit<SavedLocation, 'isFavorite' | 'lastSelectedAt'>) => void
   useDeviceLocation: () => void
   toggleFavorite: (id: string) => void
+  setLocationUi: (patch: {
+    locationLoading?: boolean
+    locationError?: string | null
+    locationPermissionDenied?: boolean
+  }) => void
 }
 
 function upsertLocation(
@@ -83,8 +92,18 @@ export const useLocationStore = create<LocationStore>()(
       deviceLon: null,
       deviceCityName: '',
       isManualSelection: false,
+      locationLoading: true,
+      locationError: null,
+      locationPermissionDenied: false,
       savedLocations: [],
       recentLocationIds: [],
+      setLocationUi: (patch) =>
+        set((state) => ({
+          locationLoading: patch.locationLoading ?? state.locationLoading,
+          locationError: patch.locationError !== undefined ? patch.locationError : state.locationError,
+          locationPermissionDenied:
+            patch.locationPermissionDenied ?? state.locationPermissionDenied,
+        })),
       setLocation: (lat, lon, cityName) =>
         set((state) => {
           if (state.isManualSelection) {
@@ -136,6 +155,24 @@ export const useLocationStore = create<LocationStore>()(
     {
       name: 'skycast-location-store',
       storage: createJSONStorage(() => inMemoryStorage),
+      // `partialize` omits `locationLoading`; default merge would keep the initial `true`
+      // while restoring `lat`/`lon`, leaving the UI stuck on "Getting your location…".
+      merge: (persistedState, currentState) => {
+        const patch =
+          persistedState !== null && typeof persistedState === 'object'
+            ? (persistedState as Partial<LocationStore>)
+            : {}
+        const merged: LocationStore = { ...currentState, ...patch }
+        if (merged.lat !== null && merged.lon !== null) {
+          return {
+            ...merged,
+            locationLoading: false,
+            locationPermissionDenied: false,
+            locationError: null,
+          }
+        }
+        return merged
+      },
       partialize: (state) => ({
         lat: state.lat,
         lon: state.lon,
@@ -146,6 +183,7 @@ export const useLocationStore = create<LocationStore>()(
         isManualSelection: state.isManualSelection,
         savedLocations: state.savedLocations,
         recentLocationIds: state.recentLocationIds,
+        // locationLoading / locationError / locationPermissionDenied are session-only
       }),
     },
   ),
