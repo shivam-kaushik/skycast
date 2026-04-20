@@ -28,6 +28,7 @@ interface OpenMeteoHourlyRaw {
   cloud_cover: number[]
   visibility: number[]
   relativehumidity_2m: number[]
+  surface_pressure: number[]
 }
 
 interface OpenMeteoDailyRaw {
@@ -87,6 +88,7 @@ function mapHourly(raw: OpenMeteoHourlyRaw): HourlyWeather {
     cloudCover: raw.cloud_cover,
     visibility: raw.visibility.map((v) => v / 1000), // meters to km
     humidity: raw.relativehumidity_2m,
+    surfacePressure: raw.surface_pressure,
   }
 }
 
@@ -136,6 +138,7 @@ export async function fetchWeather(lat: number, lon: number): Promise<WeatherDat
       'cloud_cover',
       'visibility',
       'relativehumidity_2m',
+      'surface_pressure',
     ].join(','),
     daily: [
       'temperature_2m_max',
