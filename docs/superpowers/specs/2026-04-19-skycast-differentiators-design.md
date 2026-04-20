@@ -142,7 +142,7 @@ raw = (maxPollenScore × humidityMultiplier) + windPenalty
 label = raw < 1 ? 'Low' : raw < 2 ? 'Moderate' : raw < 3 ? 'High' : 'Very High'
 ```
 
-**24h Pollen Trend Chart:** Horizontal scrollable sparkline per allergen type. Uses `recharts` (already likely available) or a lightweight `react-native-svg` bar chart.
+**24h Pollen Trend Chart:** Horizontal scrollable sparkline per allergen type. Implemented with `react-native-svg` (lightweight bar chart — no charting library needed).
 
 ### 3.6 Pressure Headache Alerts (More — free)
 
