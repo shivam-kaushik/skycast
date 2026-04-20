@@ -50,3 +50,6 @@ test-results/
 
 # Brainstorm mockups
 .superpowers/
+
+# Git worktrees
+.worktrees/
