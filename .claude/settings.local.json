@@ -29,7 +29,8 @@
       "Bash(npm install *)",
       "Bash(node *)",
       "Bash(npm remove *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(node_modules/.bin/jest *)"
     ]
   }
 }
