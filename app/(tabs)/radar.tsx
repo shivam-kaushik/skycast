@@ -17,6 +17,7 @@ import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { useLocationStore } from '@/src/store/locationStore'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
+import { useWeatherAlerts } from '@/src/hooks/useWeatherAlerts'
 import WeatherMapView from '@/src/components/radar/WeatherMapView'
 import type { MapLayer, WeatherMapHandle } from '@/src/components/radar/WeatherMapView'
 import GlobeView from '@/src/components/radar/GlobeView'
@@ -31,6 +32,8 @@ import {
   ACCENT,
   ACCENT_SOFT,
   SECONDARY,
+  DANGER,
+  WARNING,
 } from '@/src/theme/colors'
 import { FONT_BOLD, FONT_MEDIUM } from '@/src/theme/typography'
 
@@ -98,6 +101,8 @@ export default function RadarScreen() {
   const toggleFavorite = useLocationStore((s) => s.toggleFavorite)
   const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
   const { data: airQuality, isLoading: aqLoading } = useAirQuality(lat, lon)
+  const alerts = useWeatherAlerts(lat, lon, weather?.current?.weatherCode, weather?.current?.precipitationProbability)
+  const [alertDismissed, setAlertDismissed] = useState(false)
 
   const [activeLayer, setActiveLayer] = useState<MapLayer>('precipitation')
   const [isPlaying, setIsPlaying] = useState(true)
@@ -208,6 +213,31 @@ export default function RadarScreen() {
           layer={activeLayer as 'precipitation' | 'temperature' | 'wind' | 'air'}
           weather={globeWeather}
         />
+      )}
+
+      {/* ── Active alert banner ──────────────────────────────────── */}
+      {alerts.length > 0 && !alertDismissed && (
+        <View style={[styles.alertBanner, {
+          backgroundColor: alerts[0]!.severity === 'extreme'
+            ? 'rgba(255,107,107,0.18)' : 'rgba(255,209,102,0.18)',
+          borderColor: alerts[0]!.severity === 'extreme'
+            ? 'rgba(255,107,107,0.45)' : 'rgba(255,209,102,0.45)',
+        }]} pointerEvents="box-none">
+          <Ionicons
+            name="warning"
+            size={14}
+            color={alerts[0]!.severity === 'extreme' ? DANGER : WARNING}
+          />
+          <Text style={[styles.alertBannerText, {
+            color: alerts[0]!.severity === 'extreme' ? DANGER : WARNING,
+          }]} numberOfLines={1}>
+            {alerts[0]!.title}
+            {alerts.length > 1 ? ` +${alerts.length - 1} more` : ''}
+          </Text>
+          <Pressable onPress={() => setAlertDismissed(true)} hitSlop={10}>
+            <Ionicons name="close" size={14} color={TEXT_SECONDARY} />
+          </Pressable>
+        </View>
       )}
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
@@ -393,6 +423,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: TEXT_SECONDARY,
     marginTop: 4,
+  },
+  alertBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    zIndex: 50,
+  },
+  alertBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
   },
   topOverlay: {
     position: 'absolute',
