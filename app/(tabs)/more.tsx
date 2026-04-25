@@ -31,6 +31,10 @@ import PremiumGate from '@/src/components/shared/PremiumGate'
 import PaywallModal from '@/src/components/shared/PaywallModal'
 import { usePremiumStore } from '@/src/store/premiumStore'
 import { usePersonaStore } from '@/src/store/personaStore'
+import { useAuthStore } from '@/src/store/authStore'
+import { useRouter } from 'expo-router'
+import { supabase } from '@/src/api/supabase'
+import { logoutUser } from '@/src/api/purchases'
 import {
   scoreRunning,
   scoreCycling,
@@ -71,6 +75,7 @@ import {
   ON_PRIMARY,
   ON_SURFACE_VARIANT,
   SURFACE_CONTAINER,
+  DANGER,
 } from '@/src/theme/colors'
 import { FONT_BOLD } from '@/src/theme/typography'
 
@@ -112,6 +117,7 @@ interface HealthTile {
 }
 
 export default function MoreScreen() {
+  const router = useRouter()
   const { lat, lon, cityName } = useLocationStore()
   const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
   const { data: airQuality } = useAirQuality(lat, lon)
@@ -131,8 +137,19 @@ export default function MoreScreen() {
   const toggleAlert = usePrefsStore((s) => s.toggleAlert)
   const routine = useAICoachStore((s) => s.routine)
   const persona = usePersonaStore((s) => s.persona)
-  const { loadQueryCount, isPremium, isDevUnlocked, toggleDevUnlock } = usePremiumStore()
+  const { loadQueryCount, isPremium, isDevUnlocked, toggleDevUnlock, setPremium } = usePremiumStore()
+  const { user, setSession } = useAuthStore()
   const [devTapCount, setDevTapCount] = React.useState(0)
+  const [signingOut, setSigningOut] = React.useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    await logoutUser()
+    await supabase.auth.signOut()
+    setSession(null)
+    await setPremium(false)
+    setSigningOut(false)
+  }
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -430,6 +447,68 @@ export default function MoreScreen() {
           </>
         )}
         <PaywallModal />
+
+        <View style={styles.spacer} />
+
+        {/* ── Account ─────────────────────────────────────────────── */}
+        <SectionLabel text="Account" accent />
+        <GlassCard style={styles.settingsCard}>
+          {user ? (
+            <>
+              <View style={styles.accountRow}>
+                <View style={styles.accountIcon}>
+                  <Ionicons name="person-circle-outline" size={22} color={ACCENT} />
+                </View>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
+                  <Text style={styles.accountSub}>
+                    {isPremium ? 'Premium member' : 'Free plan'}
+                  </Text>
+                </View>
+                {isPremium && (
+                  <View style={styles.premiumBadge}>
+                    <Text style={styles.premiumBadgeText}>★ Premium</Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.signOutBtn}
+                onPress={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut
+                  ? <ActivityIndicator size="small" color={DANGER} />
+                  : (
+                    <>
+                      <Ionicons name="log-out-outline" size={16} color={DANGER} />
+                      <Text style={styles.signOutText}>Sign Out</Text>
+                    </>
+                  )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.accountHint}>
+                Sign in to sync your premium status across all your devices.
+              </Text>
+              <View style={styles.authBtnRow}>
+                <TouchableOpacity
+                  style={styles.signInBtn}
+                  onPress={() => router.push('/(auth)/login')}
+                >
+                  <Ionicons name="log-in-outline" size={16} color={ACCENT} />
+                  <Text style={styles.signInText}>Sign In</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.createBtn}
+                  onPress={() => router.push('/(auth)/signup')}
+                >
+                  <Text style={styles.createText}>Create Account</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </GlassCard>
 
         <View style={styles.spacer} />
 
@@ -781,4 +860,75 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: TEXT_TERTIARY,
   },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 4,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 4,
+  },
+  accountIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,193,7,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountInfo: { flex: 1 },
+  accountEmail: { fontSize: 14, color: TEXT_PRIMARY, fontWeight: '500' },
+  accountSub: { fontSize: 11, color: TEXT_TERTIARY, marginTop: 2 },
+  premiumBadge: {
+    backgroundColor: 'rgba(255,193,7,0.15)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,193,7,0.3)',
+  },
+  premiumBadgeText: { fontSize: 11, color: ACCENT, fontWeight: '700' },
+  signOutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  signOutText: { fontSize: 14, color: DANGER, fontWeight: '500' },
+  accountHint: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+    lineHeight: 18,
+    paddingHorizontal: 4,
+    marginBottom: 14,
+  },
+  authBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  signInBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 12,
+    paddingVertical: 11,
+  },
+  signInText: { fontSize: 14, color: ACCENT, fontWeight: '600' },
+  createBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT,
+    borderRadius: 12,
+    paddingVertical: 11,
+  },
+  createText: { fontSize: 14, color: '#1a0d00', fontWeight: '700' },
 })

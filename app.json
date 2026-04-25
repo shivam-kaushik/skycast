@@ -62,7 +62,9 @@
           "color": "#0A0F1E",
           "sounds": []
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

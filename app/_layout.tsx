@@ -8,7 +8,9 @@ import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useLocation } from '@/src/hooks/useLocation'
 import { usePremiumStore } from '@/src/store/premiumStore'
-import { initPurchases, checkPremiumStatus } from '@/src/api/purchases'
+import { useAuthStore } from '@/src/store/authStore'
+import { initPurchases, checkPremiumStatus, loginUser } from '@/src/api/purchases'
+import { supabase } from '@/src/api/supabase'
 import 'react-native-reanimated'
 
 export { ErrorBoundary } from 'expo-router'
@@ -28,18 +30,40 @@ function LocationBootstrap(): null {
 
 function PremiumBootstrap(): null {
   const { hydrate, setPremium, loadQueryCount } = usePremiumStore()
+  const { setSession, setLoading } = useAuthStore()
+
   useEffect(() => {
     async function bootstrap() {
-      // Restore from disk immediately — no network wait, no flash of locked state
+      // Restore premium from disk immediately — no network wait, no flash of locked state
       await hydrate()
-      // Then confirm with RevenueCat (may upgrade/downgrade the persisted status)
+
+      // Bootstrap Supabase session from secure storage
+      setLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+      setLoading(false)
+
+      // Confirm premium with RevenueCat (may upgrade/downgrade the persisted status)
       await initPurchases()
-      const isPremium = await checkPremiumStatus()
+      let isPremium: boolean
+      if (session?.user) {
+        // Logged-in user: link RevenueCat to their Supabase ID for cross-device sync
+        isPremium = await loginUser(session.user.id)
+      } else {
+        isPremium = await checkPremiumStatus()
+      }
       await setPremium(isPremium)
       if (isPremium) await loadQueryCount()
     }
     bootstrap()
-  }, [hydrate, setPremium, loadQueryCount])
+
+    // Keep auth store in sync with Supabase session changes (token refresh, sign-out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+    return () => subscription.unsubscribe()
+  }, [hydrate, setPremium, loadQueryCount, setSession, setLoading])
+
   return null
 }
 
@@ -71,6 +95,7 @@ export default function RootLayout() {
       <ThemeProvider value={DarkTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
           <Stack.Screen name="+not-found" />
         </Stack>
       </ThemeProvider>

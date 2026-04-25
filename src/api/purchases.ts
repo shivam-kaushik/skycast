@@ -63,3 +63,26 @@ export async function restorePurchases(): Promise<boolean> {
     return false
   }
 }
+
+// Call on user sign-in — links RevenueCat to the Supabase user ID for cross-device sync
+export async function loginUser(userId: string): Promise<boolean> {
+  const mod = await getModule()
+  if (!mod) return false
+  try {
+    const { customerInfo } = await mod.logIn(userId)
+    return customerInfo.entitlements.active['premium'] !== undefined
+  } catch {
+    return false
+  }
+}
+
+// Call on user sign-out — reverts to anonymous device identity
+export async function logoutUser(): Promise<void> {
+  const mod = await getModule()
+  if (!mod) return
+  try {
+    await mod.logOut()
+  } catch {
+    // ignore
+  }
+}
