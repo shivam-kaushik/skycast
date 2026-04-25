@@ -11,9 +11,9 @@ interface PremiumGateProps {
 }
 
 export default function PremiumGate({ featureName, children }: PremiumGateProps) {
-  const { isPremium, showPaywall } = usePremiumStore()
+  const { isPremium, isDevUnlocked, showPaywall } = usePremiumStore()
 
-  if (isPremium) return <>{children}</>
+  if (isPremium || isDevUnlocked) return <>{children}</>
 
   return (
     <Pressable style={styles.gate} onPress={showPaywall}>

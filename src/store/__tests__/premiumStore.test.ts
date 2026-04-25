@@ -3,9 +3,11 @@ import { usePremiumStore, MAX_DAILY_QUERIES } from '../premiumStore'
 beforeEach(() => {
   usePremiumStore.setState({
     isPremium: false,
+    isDevUnlocked: false,
     queriesUsedToday: 0,
     queryDate: new Date().toISOString().slice(0, 10),
     isPaywallVisible: false,
+    isHydrated: false,
   })
 })
 
@@ -16,8 +18,8 @@ describe('premiumStore', () => {
     expect(s.isPaywallVisible).toBe(false)
   })
 
-  it('setPremium marks user as premium', () => {
-    usePremiumStore.getState().setPremium(true)
+  it('setPremium marks user as premium and persists', async () => {
+    await usePremiumStore.getState().setPremium(true)
     expect(usePremiumStore.getState().isPremium).toBe(true)
   })
 
@@ -28,13 +30,18 @@ describe('premiumStore', () => {
     expect(usePremiumStore.getState().isPaywallVisible).toBe(false)
   })
 
-  it('canQuery returns false when not premium', () => {
-    usePremiumStore.setState({ isPremium: false })
+  it('canQuery returns false when not premium and not dev unlocked', () => {
+    usePremiumStore.setState({ isPremium: false, isDevUnlocked: false })
     expect(usePremiumStore.getState().canQuery()).toBe(false)
   })
 
   it('canQuery returns true when premium and under daily limit', () => {
     usePremiumStore.setState({ isPremium: true, queriesUsedToday: 5 })
+    expect(usePremiumStore.getState().canQuery()).toBe(true)
+  })
+
+  it('canQuery returns true when dev unlocked even without premium', () => {
+    usePremiumStore.setState({ isPremium: false, isDevUnlocked: true, queriesUsedToday: 0 })
     expect(usePremiumStore.getState().canQuery()).toBe(true)
   })
 
@@ -53,5 +60,12 @@ describe('premiumStore', () => {
     usePremiumStore.setState({ isPremium: true, queriesUsedToday: 15, queryDate: '2020-01-01' })
     await usePremiumStore.getState().incrementQuery()
     expect(usePremiumStore.getState().queriesUsedToday).toBe(1)
+  })
+
+  it('toggleDevUnlock flips dev mode and persists', async () => {
+    await usePremiumStore.getState().toggleDevUnlock()
+    expect(usePremiumStore.getState().isDevUnlocked).toBe(true)
+    await usePremiumStore.getState().toggleDevUnlock()
+    expect(usePremiumStore.getState().isDevUnlocked).toBe(false)
   })
 })

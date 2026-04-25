@@ -131,7 +131,8 @@ export default function MoreScreen() {
   const toggleAlert = usePrefsStore((s) => s.toggleAlert)
   const routine = useAICoachStore((s) => s.routine)
   const persona = usePersonaStore((s) => s.persona)
-  const { loadQueryCount } = usePremiumStore()
+  const { loadQueryCount, isPremium, isDevUnlocked, toggleDevUnlock } = usePremiumStore()
+  const [devTapCount, setDevTapCount] = React.useState(0)
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -483,6 +484,26 @@ export default function MoreScreen() {
           <Text style={styles.aboutText}>Powered by Open-Meteo · Free &amp; open data</Text>
         </View>
 
+        {/* ── Version label — tap 7× to toggle dev unlock ─────────── */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => {
+            const next = devTapCount + 1
+            setDevTapCount(next)
+            if (next >= 7) {
+              setDevTapCount(0)
+              toggleDevUnlock()
+            }
+          }}
+          style={styles.versionRow}
+        >
+          <Text style={styles.versionText}>
+            Skycast v1.0.0
+            {isDevUnlocked ? '  🔓 Dev Mode ON' : isPremium ? '  ★ Premium' : ''}
+            {devTapCount > 0 && devTapCount < 7 ? `  (${7 - devTapCount} more)` : ''}
+          </Text>
+        </TouchableOpacity>
+
         <View style={styles.bottomPad} />
       </ScrollView>
     </SafeAreaView>
@@ -749,6 +770,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   aboutText: {
+    fontSize: 11,
+    color: TEXT_TERTIARY,
+  },
+  versionRow: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  versionText: {
     fontSize: 11,
     color: TEXT_TERTIARY,
   },

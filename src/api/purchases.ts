@@ -1,7 +1,10 @@
 import { Platform } from 'react-native'
 
-const RC_API_KEY_IOS = process.env.EXPO_PUBLIC_RC_API_KEY_IOS ?? ''
-const RC_API_KEY_ANDROID = process.env.EXPO_PUBLIC_RC_API_KEY_ANDROID ?? ''
+// Single shared key (works for both platforms in sandbox / test environments).
+// Override with platform-specific keys in production by setting both iOS and Android vars.
+const RC_API_KEY_SHARED = process.env.EXPO_PUBLIC_RC_API_KEY ?? ''
+const RC_API_KEY_IOS = process.env.EXPO_PUBLIC_RC_API_KEY_IOS ?? RC_API_KEY_SHARED
+const RC_API_KEY_ANDROID = process.env.EXPO_PUBLIC_RC_API_KEY_ANDROID ?? RC_API_KEY_SHARED
 
 let Purchases: typeof import('react-native-purchases').default | null = null
 
