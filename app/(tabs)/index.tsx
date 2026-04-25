@@ -20,7 +20,15 @@ import HourlyStrip from '@/src/components/home/HourlyStrip'
 import ForecastList from '@/src/components/home/ForecastList'
 import MetricTilesGrid from '@/src/components/home/MetricTilesGrid'
 import LocationPickerModal from '@/src/components/home/LocationPickerModal'
+import PersonaSwitcher from '@/src/components/home/PersonaSwitcher'
+import RainProbabilityBar from '@/src/components/home/RainProbabilityBar'
+import PersonaInsightCard from '@/src/components/home/PersonaInsightCard'
+import SafetyAlertBadge from '@/src/components/home/SafetyAlertBadge'
+import ExtendedForecastCard from '@/src/components/home/ExtendedForecastCard'
+import PremiumGate from '@/src/components/shared/PremiumGate'
 import SectionLabel from '@/src/components/shared/SectionLabel'
+import { useWeatherAlerts } from '@/src/hooks/useWeatherAlerts'
+import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { getWeatherCodeInfo } from '@/src/utils/weatherCodes'
 import { formatTemp } from '@/src/utils/formatTemp'
 import {
@@ -67,6 +75,8 @@ export default function HomeScreen() {
     lat,
     lon,
   )
+  const { data: airData } = useAirQuality(lat, lon)
+  const alerts = useWeatherAlerts(lat, lon, weather?.current?.weatherCode, weather?.current?.precipitationProbability)
 
   const isLoading = locationLoading || weatherLoading
 
@@ -218,8 +228,36 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {/* ── Safety alerts ───────────────────────────────────────── */}
+          {alerts.length > 0 && (
+            <SafetyAlertBadge alerts={alerts} />
+          )}
+
+          {/* ── Persona switcher ────────────────────────────────────── */}
+          <PersonaSwitcher />
+
+          {/* ── Rain probability bar ────────────────────────────────── */}
+          <RainProbabilityBar hourly={hourly} />
+
           {/* ── Daily brief ─────────────────────────────────────────── */}
           <DailyBriefCard current={current} hourly={hourly} />
+
+          {/* ── Persona insight ─────────────────────────────────────── */}
+          <PersonaInsightCard
+            hourly={hourly}
+            daily={daily}
+            airHourly={airData?.hourly ?? {
+              time: [], pm10: [], pm25: [], no2: [], ozone: [],
+              alderPollen: [], birchPollen: [], grassPollen: [],
+              mugwortPollen: [], olivePollen: [], ragweedPollen: [],
+            }}
+            today={daily.time[0] ?? ''}
+            currentHourIdx={0}
+            humidity={current.humidity}
+            windSpeed={current.windSpeed}
+            uvIndex={current.uvIndex}
+            usAqi={0}
+          />
 
           <View style={styles.spacer} />
 
@@ -240,6 +278,13 @@ export default function HomeScreen() {
             <SectionLabel text="14-Day Forecast" />
           </View>
           <ForecastList daily={daily} unit={unit} days={14} />
+
+          <View style={styles.spacer} />
+
+          {/* ── Extended forecast (days 8-16, premium) ──────────────── */}
+          <PremiumGate featureName="16-Day Extended Forecast">
+            <ExtendedForecastCard daily={daily} unit={unit} />
+          </PremiumGate>
 
           <View style={styles.spacer} />
 

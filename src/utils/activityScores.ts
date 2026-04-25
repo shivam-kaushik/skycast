@@ -206,8 +206,8 @@ export function scoreCycling(
   else if (s.maxPrecipProb > 40) score -= 1
 
   // Wind is more impactful for cycling
-  if (s.maxWindSpeed > 40) score -= 4
-  else if (s.maxWindSpeed > 30) score -= 2
+  if (s.maxWindSpeed > 40) score -= 6
+  else if (s.maxWindSpeed > 30) score -= 3
   else if (s.maxWindSpeed > 20) score -= 1
 
   if (s.maxTemp > 36) score -= 2
@@ -466,14 +466,14 @@ export function scoreStargazing(
   let score = 10
 
   // Cloud cover is the primary factor
-  if (s.avgCloudCover > 80) score -= 6
-  else if (s.avgCloudCover > 60) score -= 4
-  else if (s.avgCloudCover > 40) score -= 2
+  if (s.avgCloudCover > 80) score -= 8
+  else if (s.avgCloudCover > 60) score -= 5
+  else if (s.avgCloudCover > 40) score -= 3
   else if (s.avgCloudCover > 20) score -= 1
 
   // Rain ruins it completely
-  if (s.maxPrecipProb > 60) score -= 4
-  else if (s.maxPrecipProb > 40) score -= 2
+  if (s.maxPrecipProb > 60) score -= 8
+  else if (s.maxPrecipProb > 40) score -= 4
 
   if (s.hasThunderstorm) score -= 4
 

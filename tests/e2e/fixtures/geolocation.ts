@@ -46,7 +46,7 @@ export async function installBrowserGeolocationStub(page: Page): Promise<void> {
       state: 'granted',
       addEventListener: () => {},
       removeEventListener: () => {},
-    } as PermissionStatus
+    } as unknown as PermissionStatus
 
     if (navigator.permissions?.query) {
       navigator.permissions.query = () => Promise.resolve(granted)

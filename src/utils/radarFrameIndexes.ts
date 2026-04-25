@@ -200,6 +200,7 @@ export function singleApiIndexNearestToNow(
  * Clamp Open-Meteo `valid_times_*` indices and drop duplicates (stale metadata / rounding).
  */
 export function sanitizeOmFrameIndices(indices: readonly number[], validTimesLength: number): number[] {
+  if (validTimesLength === 0) return []
   const max = Math.max(0, validTimesLength - 1)
   const out: number[] = []
   const seen = new Set<number>()

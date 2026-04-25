@@ -26,6 +26,7 @@ export interface HourlyWeather {
   cloudCover: number[]
   visibility: number[]
   humidity: number[]
+  surfacePressure?: number[]
 }
 
 export interface DailyWeather {
@@ -84,4 +85,55 @@ export interface ActivityScore {
   reason: string // 1 short sentence
   bestWindow?: string // e.g. "Best 7–10 AM"
   color: string // hex color for the score
+}
+
+export interface LunarData {
+  phaseName: string
+  illumination: number
+  phaseAngle: number
+  rise: Date | null
+  set: Date | null
+  nextFullMoon: Date
+  nextNewMoon: Date
+}
+
+export interface RainbowWindow {
+  likelyAt: Date
+  faceDirection: 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
+}
+
+export interface SkyPhenomena {
+  stargazingScore: number
+  sunsetScore: number
+  goldenHourStart: Date
+  goldenHourEnd: Date
+  goldenHourQuality: 'Excellent' | 'Good' | 'Fair'
+  rainbowWindow: RainbowWindow | null
+}
+
+export interface RainSegment {
+  probability: number
+  time: Date
+}
+
+export interface PressureAlertData {
+  alert: boolean
+  delta: number
+  direction: 'rising' | 'falling'
+  windowStart: number
+}
+
+export interface AllergyRiskData {
+  label: 'Low' | 'Moderate' | 'High' | 'Very High'
+  score: number
+  dominantAllergen: string | null
+}
+
+export interface WeatherAlert {
+  id: string
+  title: string
+  description: string
+  severity: 'moderate' | 'severe' | 'extreme'
+  source: 'nws' | 'weathercode' | 'precipitation'
+  geometry: { type: 'Polygon'; coordinates: number[][][] } | null
 }

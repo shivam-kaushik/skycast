@@ -1,11 +1,12 @@
 import React from 'react'
-import renderer from 'react-test-renderer'
+import renderer, { act } from 'react-test-renderer'
 import AIFeaturesCard from './AIFeaturesCard'
 
 describe('AIFeaturesCard', () => {
-  it('renders phases and notifications', () => {
-    const tree = renderer
-      .create(
+  it('renders phases and notifications', async () => {
+    let tree!: renderer.ReactTestRenderer
+    await act(async () => {
+      tree = renderer.create(
         <AIFeaturesCard
           phase1={[
             {
@@ -31,10 +32,11 @@ describe('AIFeaturesCard', () => {
           ]}
         />,
       )
-      .toJSON()
+    })
 
-    expect(JSON.stringify(tree)).toMatch(/AI planner and alerts/)
-    expect(JSON.stringify(tree)).toMatch(/Running window/)
-    expect(JSON.stringify(tree)).toMatch(/Rain risk/)
+    const json = JSON.stringify(tree.toJSON())
+    expect(json).toMatch(/AI planner and alerts/)
+    expect(json).toMatch(/Running window/)
+    expect(json).toMatch(/Rain risk/)
   })
 })
