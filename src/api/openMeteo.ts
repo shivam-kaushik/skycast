@@ -152,7 +152,7 @@ export async function fetchWeather(lat: number, lon: number): Promise<WeatherDat
       'sunrise',
       'sunset',
     ].join(','),
-    forecast_days: '14',
+    forecast_days: '16',
     timezone: 'auto',
   })
 

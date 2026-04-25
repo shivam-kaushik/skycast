@@ -24,6 +24,8 @@ import PersonaSwitcher from '@/src/components/home/PersonaSwitcher'
 import RainProbabilityBar from '@/src/components/home/RainProbabilityBar'
 import PersonaInsightCard from '@/src/components/home/PersonaInsightCard'
 import SafetyAlertBadge from '@/src/components/home/SafetyAlertBadge'
+import ExtendedForecastCard from '@/src/components/home/ExtendedForecastCard'
+import PremiumGate from '@/src/components/shared/PremiumGate'
 import SectionLabel from '@/src/components/shared/SectionLabel'
 import { useWeatherAlerts } from '@/src/hooks/useWeatherAlerts'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
@@ -276,6 +278,13 @@ export default function HomeScreen() {
             <SectionLabel text="14-Day Forecast" />
           </View>
           <ForecastList daily={daily} unit={unit} days={14} />
+
+          <View style={styles.spacer} />
+
+          {/* ── Extended forecast (days 8-16, premium) ──────────────── */}
+          <PremiumGate featureName="16-Day Extended Forecast">
+            <ExtendedForecastCard daily={daily} unit={unit} />
+          </PremiumGate>
 
           <View style={styles.spacer} />
 
