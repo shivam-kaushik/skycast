@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import {
   View, Text, TextInput, Pressable, StyleSheet,
   ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, StatusBar,
+  ScrollView, StatusBar, Image,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as AppleAuthentication from 'expo-apple-authentication'
+import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin'
 import { supabase } from '@/src/api/supabase'
 import { loginUser } from '@/src/api/purchases'
 import { useAuthStore } from '@/src/store/authStore'
@@ -16,6 +17,12 @@ import {
   GLASS_BG, GHOST_BORDER, DANGER, GOOD,
 } from '@/src/theme/colors'
 import { FONT_BOLD, FONT_MEDIUM, FONT_REGULAR, FONT_SEMIBOLD } from '@/src/theme/typography'
+
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+  scopes: ['email', 'profile'],
+})
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -27,7 +34,15 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [appleLoading, setAppleLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  async function afterSession(userId: string) {
+    const isPremium = await loginUser(userId)
+    await setPremium(isPremium)
+    if (isPremium) await loadQueryCount()
+    router.back()
+  }
 
   async function handleLogin() {
     if (!email.trim() || !password) {
@@ -47,12 +62,48 @@ export default function LoginScreen() {
     }
     if (data.session) {
       setSession(data.session)
-      const isPremium = await loginUser(data.session.user.id)
-      await setPremium(isPremium)
-      if (isPremium) await loadQueryCount()
+      await afterSession(data.session.user.id)
     }
     setLoading(false)
-    router.back()
+  }
+
+  async function handleGoogleLogin() {
+    setGoogleLoading(true)
+    setError(null)
+    try {
+      await GoogleSignin.hasPlayServices()
+      const userInfo = await GoogleSignin.signIn()
+      const tokens = await GoogleSignin.getTokens()
+      if (!tokens.idToken) {
+        setError('Google sign-in failed — no ID token returned.')
+        return
+      }
+      const { data, error: authError } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: tokens.idToken,
+      })
+      if (authError) { setError(authError.message); return }
+      if (data.session) {
+        setSession(data.session)
+        await afterSession(data.session.user.id)
+      }
+    } catch (e: unknown) {
+      if (isErrorWithCode(e)) {
+        if (e.code === statusCodes.SIGN_IN_CANCELLED) {
+          // user cancelled — do nothing
+        } else if (e.code === statusCodes.IN_PROGRESS) {
+          setError('Sign-in already in progress.')
+        } else if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          setError('Google Play Services not available on this device.')
+        } else {
+          setError('Google sign-in failed. Please try again.')
+        }
+      } else {
+        setError('Google sign-in failed. Please try again.')
+      }
+    } finally {
+      setGoogleLoading(false)
+    }
   }
 
   async function handleAppleLogin() {
@@ -72,10 +123,7 @@ export default function LoginScreen() {
       if (authError) { setError(authError.message); return }
       if (data.session) {
         setSession(data.session)
-        const isPremium = await loginUser(data.session.user.id)
-        await setPremium(isPremium)
-        if (isPremium) await loadQueryCount()
-        router.back()
+        await afterSession(data.session.user.id)
       }
     } catch (e: unknown) {
       if (e && typeof e === 'object' && 'code' in e && e.code === 'ERR_REQUEST_CANCELED') {
@@ -96,7 +144,6 @@ export default function LoginScreen() {
       <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
-        {/* Header */}
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} hitSlop={16} style={styles.backBtn}>
             <Ionicons name="chevron-down" size={24} color={TEXT_SECONDARY} />
@@ -111,13 +158,53 @@ export default function LoginScreen() {
         <Text style={styles.heading}>Welcome back</Text>
         <Text style={styles.sub}>Sign in to sync your premium across all your devices.</Text>
 
-        {/* Error */}
         {error && (
           <View style={styles.errorBox}>
             <Ionicons name="alert-circle-outline" size={16} color={DANGER} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
+
+        {/* Social sign-in buttons */}
+        <View style={styles.socialRow}>
+          <Pressable
+            style={styles.socialBtn}
+            onPress={handleGoogleLogin}
+            disabled={googleLoading || appleLoading || loading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator size="small" color={TEXT_PRIMARY} />
+            ) : (
+              <>
+                <GoogleIcon />
+                <Text style={styles.socialBtnText}>Google</Text>
+              </>
+            )}
+          </Pressable>
+
+          {Platform.OS === 'ios' && (
+            <Pressable
+              style={styles.socialBtn}
+              onPress={handleAppleLogin}
+              disabled={appleLoading || googleLoading || loading}
+            >
+              {appleLoading ? (
+                <ActivityIndicator size="small" color={TEXT_PRIMARY} />
+              ) : (
+                <>
+                  <Ionicons name="logo-apple" size={18} color={TEXT_PRIMARY} />
+                  <Text style={styles.socialBtnText}>Apple</Text>
+                </>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or sign in with email</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         {/* Email */}
         <View style={styles.fieldGroup}>
@@ -169,38 +256,12 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        {/* Sign in button */}
         <Pressable style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
           {loading
-            ? <ActivityIndicator color="#000" />
+            ? <ActivityIndicator color="#1a0d00" />
             : <Text style={styles.primaryBtnText}>Sign In</Text>}
         </Pressable>
 
-        {/* Divider */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or continue with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Apple Sign In */}
-        {Platform.OS === 'ios' && (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-            cornerRadius={14}
-            style={styles.appleBtn}
-            onPress={handleAppleLogin}
-          />
-        )}
-
-        {appleLoading && (
-          <View style={styles.centeredRow}>
-            <ActivityIndicator color={ACCENT} />
-          </View>
-        )}
-
-        {/* Sign up link */}
         <View style={styles.signupRow}>
           <Text style={styles.signupPrompt}>Don't have an account? </Text>
           <Pressable onPress={() => router.replace('/(auth)/signup')}>
@@ -214,6 +275,14 @@ export default function LoginScreen() {
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
+  )
+}
+
+function GoogleIcon() {
+  return (
+    <View style={styles.googleIconWrap}>
+      <Text style={styles.googleG}>G</Text>
+    </View>
   )
 }
 
@@ -237,6 +306,21 @@ const styles = StyleSheet.create({
     padding: 12, marginBottom: 20,
   },
   errorText: { fontSize: 13, color: DANGER, flex: 1, ...FONT_MEDIUM },
+  socialRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  socialBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, height: 52, borderRadius: 14,
+    backgroundColor: GLASS_BG, borderWidth: 1, borderColor: GHOST_BORDER,
+  },
+  socialBtnText: { fontSize: 15, color: TEXT_PRIMARY, ...FONT_SEMIBOLD },
+  googleIconWrap: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+  },
+  googleG: { fontSize: 12, fontWeight: '700', color: '#4285F4' },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: GHOST_BORDER },
+  dividerText: { fontSize: 12, color: TEXT_TERTIARY, ...FONT_REGULAR },
   fieldGroup: { marginBottom: 16 },
   fieldLabel: { fontSize: 12, color: TEXT_TERTIARY, ...FONT_SEMIBOLD, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
@@ -253,12 +337,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 20,
   },
   primaryBtnText: { fontSize: 16, color: '#1a0d00', ...FONT_BOLD },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: GHOST_BORDER },
-  dividerText: { fontSize: 12, color: TEXT_TERTIARY, ...FONT_REGULAR },
-  appleBtn: { width: '100%', height: 52, marginBottom: 8 },
-  centeredRow: { alignItems: 'center', paddingVertical: 8 },
-  signupRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  signupRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 8 },
   signupPrompt: { fontSize: 14, color: TEXT_SECONDARY, ...FONT_REGULAR },
   signupLink: { fontSize: 14, color: ACCENT, ...FONT_SEMIBOLD },
   disclaimer: {
