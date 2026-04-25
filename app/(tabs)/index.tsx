@@ -20,7 +20,7 @@ import HourlyStrip from '@/src/components/home/HourlyStrip'
 import ForecastList from '@/src/components/home/ForecastList'
 import MetricTilesGrid from '@/src/components/home/MetricTilesGrid'
 import LocationPickerModal from '@/src/components/home/LocationPickerModal'
-import PersonaSwitcher from '@/src/components/home/PersonaSwitcher'
+import DailyInsightsCarousel from '@/src/components/home/DailyInsightsCarousel'
 import RainProbabilityBar from '@/src/components/home/RainProbabilityBar'
 import PersonaInsightCard from '@/src/components/home/PersonaInsightCard'
 import SafetyAlertBadge from '@/src/components/home/SafetyAlertBadge'
@@ -247,8 +247,14 @@ export default function HomeScreen() {
             onSeeMap={handleSeeMap}
           />
 
-          {/* ── Persona switcher ────────────────────────────────────── */}
-          <PersonaSwitcher />
+          {/* ── Daily analytics carousel ────────────────────────────── */}
+          <DailyInsightsCarousel
+            hourly={hourly}
+            daily={daily}
+            airQuality={airData ?? undefined}
+            unit={unit}
+            today={daily.time[0] ?? ''}
+          />
 
           {/* ── Rain probability bar ────────────────────────────────── */}
           <RainProbabilityBar hourly={hourly} />
