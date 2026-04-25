@@ -23,6 +23,13 @@ import SectionLabel from '@/src/components/shared/SectionLabel'
 import HistoryBriefCard from '@/src/components/more/HistoryBriefCard'
 import ActivityWeekOutlook from '@/src/components/more/ActivityWeekOutlook'
 import AIFeaturesCard from '@/src/components/more/AIFeaturesCard'
+import AIChatSheet from '@/src/components/more/AIChatSheet'
+import WardrobeAdvisorCard from '@/src/components/more/WardrobeAdvisorCard'
+import TripBriefingCard from '@/src/components/more/TripBriefingCard'
+import PremiumGate from '@/src/components/shared/PremiumGate'
+import PaywallModal from '@/src/components/shared/PaywallModal'
+import { usePremiumStore } from '@/src/store/premiumStore'
+import { usePersonaStore } from '@/src/store/personaStore'
 import {
   scoreRunning,
   scoreCycling,
@@ -122,6 +129,8 @@ export default function MoreScreen() {
   const alertsEnabled = usePrefsStore((s) => s.alertsEnabled)
   const toggleAlert = usePrefsStore((s) => s.toggleAlert)
   const routine = useAICoachStore((s) => s.routine)
+  const persona = usePersonaStore((s) => s.persona)
+  const { loadQueryCount } = usePremiumStore()
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -212,6 +221,23 @@ export default function MoreScreen() {
   )
   const phase2Insights = useMemo(() => (aiInputs ? buildPhase2Insights(aiInputs) : []), [aiInputs])
   const phase3Insights = useMemo(() => (aiInputs ? buildPhase3Insights(aiInputs) : []), [aiInputs])
+
+  const weatherCtx = useMemo(() => {
+    if (!weather) return null
+    return {
+      current: weather.current,
+      hourly: weather.hourly,
+      daily: weather.daily,
+      airQuality: airQuality ?? undefined,
+      routine,
+      persona,
+      unit,
+    }
+  }, [weather, airQuality, routine, persona, unit])
+
+  React.useEffect(() => {
+    loadQueryCount()
+  }, [loadQueryCount])
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -368,20 +394,28 @@ export default function MoreScreen() {
 
         <View style={styles.spacer} />
 
-        <SectionLabel text="AI weather intelligence" accent />
-        {weatherLoading || !weather ? (
+        <SectionLabel text="Premium AI Features" accent />
+        {weatherLoading || !weather || !weatherCtx ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color={ACCENT} />
-            <Text style={styles.loadingText}>Preparing AI insights…</Text>
+            <Text style={styles.loadingText}>Loading…</Text>
           </View>
         ) : (
-          <AIFeaturesCard
-            phase1={phase1Insights}
-            phase2={phase2Insights}
-            phase3={phase3Insights}
-            notifications={smartNotifications}
-          />
+          <>
+            <PremiumGate featureName="AI Chat Assistant">
+              <AIChatSheet weatherCtx={weatherCtx} />
+            </PremiumGate>
+            <View style={styles.spacer} />
+            <PremiumGate featureName="AI Wardrobe Advisor">
+              <WardrobeAdvisorCard weatherCtx={weatherCtx} />
+            </PremiumGate>
+            <View style={styles.spacer} />
+            <PremiumGate featureName="Trip Weather Briefing">
+              <TripBriefingCard weatherCtx={weatherCtx} />
+            </PremiumGate>
+          </>
         )}
+        <PaywallModal />
 
         <View style={styles.spacer} />
 
