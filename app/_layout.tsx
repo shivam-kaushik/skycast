@@ -27,18 +27,19 @@ function LocationBootstrap(): null {
 }
 
 function PremiumBootstrap(): null {
-  const { setPremium, loadQueryCount } = usePremiumStore()
+  const { hydrate, setPremium, loadQueryCount } = usePremiumStore()
   useEffect(() => {
     async function bootstrap() {
+      // Restore from disk immediately — no network wait, no flash of locked state
+      await hydrate()
+      // Then confirm with RevenueCat (may upgrade/downgrade the persisted status)
       await initPurchases()
       const isPremium = await checkPremiumStatus()
-      if (isPremium) {
-        setPremium(true)
-        await loadQueryCount()
-      }
+      await setPremium(isPremium)
+      if (isPremium) await loadQueryCount()
     }
     bootstrap()
-  }, [setPremium, loadQueryCount])
+  }, [hydrate, setPremium, loadQueryCount])
   return null
 }
 
