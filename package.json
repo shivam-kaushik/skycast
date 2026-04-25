@@ -18,7 +18,9 @@
     "preset": "jest-expo",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1",
-      "^react-native-webview$": "<rootDir>/src/__mocks__/react-native-webview.ts"
+      "^react-native-webview$": "<rootDir>/src/__mocks__/react-native-webview.ts",
+      "^react-native-purchases$": "<rootDir>/src/__mocks__/react-native-purchases.ts",
+      "^@react-native-async-storage/async-storage$": "<rootDir>/src/__mocks__/async-storage.ts"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
