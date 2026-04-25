@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import PersonaSwitcher from '@/src/components/home/PersonaSwitcher'
 import RainProbabilityBar from '@/src/components/home/RainProbabilityBar'
 import PersonaInsightCard from '@/src/components/home/PersonaInsightCard'
 import SafetyAlertBadge from '@/src/components/home/SafetyAlertBadge'
+import AlertDetailSheet from '@/src/components/home/AlertDetailSheet'
 import ExtendedForecastCard from '@/src/components/home/ExtendedForecastCard'
 import PremiumGate from '@/src/components/shared/PremiumGate'
 import SectionLabel from '@/src/components/shared/SectionLabel'
@@ -44,6 +45,7 @@ import {
   SECONDARY,
 } from '@/src/theme/colors'
 import { FONT_BOLD, FONT_EXTRABOLD, FONT_MEDIUM, FONT_REGULAR } from '@/src/theme/typography'
+import { useRouter } from 'expo-router'
 import { getAmbientVisualKind, hasRainishHourlyInNextHours, isDaytimeFromSun } from '@/src/utils/ambientWeatherKind'
 import { homeScrimGradient } from '@/src/utils/homeAmbientOverlay'
 import { maxPrecipitationProbabilityNextHours } from '@/src/utils/hourlyPrecipMax'
@@ -59,6 +61,7 @@ function windDirShort(deg: number): string {
 }
 
 export default function HomeScreen() {
+  const router = useRouter()
   const { lat, lon, cityName, deviceCityName, savedLocations, recentLocationIds } =
     useLocationStore()
   const selectManualLocation = useLocationStore((s) => s.selectManualLocation)
@@ -70,6 +73,11 @@ export default function HomeScreen() {
   const unit = usePrefsStore((s) => s.unit)
   const setUnit = usePrefsStore((s) => s.setUnit)
   const [isPickerOpen, setPickerOpen] = useState(false)
+  const [alertSheetOpen, setAlertSheetOpen] = useState(false)
+  const handleSeeMap = useCallback(() => {
+    setAlertSheetOpen(false)
+    router.navigate('/radar')
+  }, [router])
 
   const { data: weather, isLoading: weatherLoading, error: weatherError, refetch } = useWeather(
     lat,
@@ -230,8 +238,14 @@ export default function HomeScreen() {
 
           {/* ── Safety alerts ───────────────────────────────────────── */}
           {alerts.length > 0 && (
-            <SafetyAlertBadge alerts={alerts} />
+            <SafetyAlertBadge alerts={alerts} onPress={() => setAlertSheetOpen(true)} />
           )}
+          <AlertDetailSheet
+            alerts={alerts}
+            visible={alertSheetOpen}
+            onClose={() => setAlertSheetOpen(false)}
+            onSeeMap={handleSeeMap}
+          />
 
           {/* ── Persona switcher ────────────────────────────────────── */}
           <PersonaSwitcher />
