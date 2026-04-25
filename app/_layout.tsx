@@ -7,6 +7,8 @@ import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useLocation } from '@/src/hooks/useLocation'
+import { usePremiumStore } from '@/src/store/premiumStore'
+import { initPurchases, checkPremiumStatus } from '@/src/api/purchases'
 import 'react-native-reanimated'
 
 export { ErrorBoundary } from 'expo-router'
@@ -21,6 +23,22 @@ const queryClient = new QueryClient()
 
 function LocationBootstrap(): null {
   useLocation()
+  return null
+}
+
+function PremiumBootstrap(): null {
+  const { setPremium, loadQueryCount } = usePremiumStore()
+  useEffect(() => {
+    async function bootstrap() {
+      await initPurchases()
+      const isPremium = await checkPremiumStatus()
+      if (isPremium) {
+        setPremium(true)
+        await loadQueryCount()
+      }
+    }
+    bootstrap()
+  }, [setPremium, loadQueryCount])
   return null
 }
 
@@ -48,6 +66,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <LocationBootstrap />
+      <PremiumBootstrap />
       <ThemeProvider value={DarkTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
