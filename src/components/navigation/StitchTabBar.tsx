@@ -13,6 +13,7 @@ const TAB_ICONS: Record<string, { active: IoniconName; idle: IoniconName }> = {
   index: { active: 'home', idle: 'home-outline' },
   radar: { active: 'radio', idle: 'radio-outline' },
   air: { active: 'leaf', idle: 'leaf-outline' },
+  sky: { active: 'moon', idle: 'moon-outline' },
   more: { active: 'ellipsis-horizontal', idle: 'ellipsis-horizontal' },
 }
 

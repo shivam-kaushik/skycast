@@ -26,7 +26,7 @@ export interface HourlyWeather {
   cloudCover: number[]
   visibility: number[]
   humidity: number[]
-  surfacePressure: number[]
+  surfacePressure?: number[]
 }
 
 export interface DailyWeather {

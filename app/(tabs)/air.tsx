@@ -21,6 +21,9 @@ import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 import AQIGauge from '@/src/components/air/AQIGauge'
 import PollenBars from '@/src/components/air/PollenBars'
 import PollutantList from '@/src/components/air/PollutantList'
+import AllergyRiskIndex from '@/src/components/air/AllergyRiskIndex'
+import PollenTrendChart from '@/src/components/air/PollenTrendChart'
+import { computeAllergyRisk } from '@/src/utils/allergyRisk'
 import GlassCard from '@/src/components/shared/GlassCard'
 import {
   BG,
@@ -88,6 +91,7 @@ export default function AirScreen() {
   const windSpeed = weather?.current.windSpeed ?? 0
   const windDir = weather?.current.windDirection ?? 0
   const humidity = weather?.current.humidity ?? 0
+  const allergyRisk = computeAllergyRisk(hourly, currentHourIdx, humidity, windSpeed)
 
   return (
     <View style={styles.screen}>
@@ -173,7 +177,9 @@ export default function AirScreen() {
             <Ionicons name="flower-outline" size={22} color={ACCENT} />
             <Text style={styles.h2}>Allergen Outlook</Text>
           </View>
+          <AllergyRiskIndex risk={allergyRisk} humidity={humidity} windSpeed={windSpeed} />
           <PollenBars hourly={hourly} currentHourIdx={currentHourIdx} />
+          <PollenTrendChart hourly={hourly} startIdx={currentHourIdx} />
 
           <GlassCard style={styles.mapCard}>
             <ImageBackground source={{ uri: MAP_IMAGE }} style={styles.mapImage} imageStyle={styles.mapImg}>

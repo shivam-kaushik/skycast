@@ -41,6 +41,8 @@ import {
   airQualityHourIndex,
   maxPollenLevelAtHour,
 } from '@/src/utils/healthInsights'
+import { usePressureAlert } from '@/src/hooks/usePressureAlert'
+import HealthInsightsCard from '@/src/components/more/HealthInsightsCard'
 import { describeAQI, describeUV } from '@/src/utils/weatherDescriptions'
 import type { ActivityScore } from '@/src/types/weather'
 import { useAICoachStore } from '@/src/store/aiCoachStore'
@@ -105,6 +107,7 @@ export default function MoreScreen() {
   const { lat, lon, cityName } = useLocationStore()
   const { data: weather, isLoading: weatherLoading } = useWeather(lat, lon)
   const { data: airQuality } = useAirQuality(lat, lon)
+  const pressureAlert = usePressureAlert(weather?.hourly)
   const {
     data: era5,
     isLoading: eraLoading,
@@ -255,6 +258,16 @@ export default function MoreScreen() {
               </GlassCard>
             ))}
           </ScrollView>
+        )}
+
+        {pressureAlert?.alert && (
+          <HealthInsightsCard
+            lines={[
+              pressureAlert.direction === 'falling'
+                ? `Pressure dropping fast (${Math.abs(Math.round(pressureAlert.delta))} hPa) — headache or migraine risk elevated.`
+                : `Pressure rising sharply (${Math.round(pressureAlert.delta)} hPa) — some people may feel sinus pressure.`,
+            ]}
+          />
         )}
 
         <View style={styles.spacer} />

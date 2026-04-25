@@ -16,6 +16,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="radar" options={{ title: 'Radar' }} />
       <Tabs.Screen name="air" options={{ title: 'Air' }} />
+      <Tabs.Screen name="sky" options={{ title: 'Sky' }} />
       <Tabs.Screen name="more" options={{ title: 'More' }} />
       <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
