@@ -19,6 +19,7 @@ import { useWeather } from '@/src/hooks/useWeather'
 import { useAirQuality } from '@/src/hooks/useAirQuality'
 import { useEra5History } from '@/src/hooks/useEra5History'
 import GlassCard from '@/src/components/shared/GlassCard'
+import PersonaSwitcher from '@/src/components/home/PersonaSwitcher'
 import SectionLabel from '@/src/components/shared/SectionLabel'
 import HistoryBriefCard from '@/src/components/more/HistoryBriefCard'
 import ActivityWeekOutlook from '@/src/components/more/ActivityWeekOutlook'
@@ -258,6 +259,18 @@ export default function MoreScreen() {
           </View>
         </View>
 
+        {/* ── Persona ─────────────────────────────────────────────── */}
+        <GlassCard style={styles.personaCard}>
+          <View style={styles.personaHeader}>
+            <Ionicons name="person-circle-outline" size={20} color={ACCENT} />
+            <Text style={styles.personaTitle}>Your Profile</Text>
+          </View>
+          <Text style={styles.personaHint}>
+            Choose your focus so Skycast can tailor insights, activity scores, and AI advice to you.
+          </Text>
+          <PersonaSwitcher />
+        </GlassCard>
+
         <View style={styles.sectionHead}>
           <SectionLabel text="Health & comfort" accent />
           <Text style={styles.liveTag}>Live insights</Text>
@@ -477,6 +490,28 @@ export default function MoreScreen() {
 }
 
 const styles = StyleSheet.create({
+  personaCard: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  personaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  personaTitle: {
+    fontSize: 15,
+    color: TEXT_PRIMARY,
+    ...FONT_BOLD,
+  },
+  personaHint: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+    lineHeight: 18,
+  },
   screen: {
     flex: 1,
     backgroundColor: BG,
