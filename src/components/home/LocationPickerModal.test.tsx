@@ -1,13 +1,14 @@
 import React from 'react'
-import renderer from 'react-test-renderer'
+import renderer, { act } from 'react-test-renderer'
 import LocationPickerModal from '@/src/components/home/LocationPickerModal'
 
 describe('LocationPickerModal', () => {
-  it('renders without crashing', () => {
-    const tree = renderer
-      .create(
+  it('renders without crashing', async () => {
+    let tree!: renderer.ReactTestRenderer
+    await act(async () => {
+      tree = renderer.create(
         <LocationPickerModal
-          visible={false}
+          visible={true}
           deviceCityName="Toronto"
           savedLocations={[]}
           recentLocationIds={[]}
@@ -17,8 +18,7 @@ describe('LocationPickerModal', () => {
           onToggleFavorite={() => {}}
         />,
       )
-      .toJSON()
-
-    expect(tree).toBeTruthy()
+    })
+    expect(tree.toJSON()).toBeTruthy()
   })
 })

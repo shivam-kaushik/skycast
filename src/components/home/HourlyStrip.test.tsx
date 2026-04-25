@@ -1,5 +1,5 @@
 import React from 'react'
-import TestRenderer from 'react-test-renderer'
+import TestRenderer, { act } from 'react-test-renderer'
 import HourlyStrip from '@/src/components/home/HourlyStrip'
 import type { DailyWeather, HourlyWeather } from '@/src/types/weather'
 
@@ -40,10 +40,13 @@ function mockDaily(): DailyWeather {
 }
 
 describe('HourlyStrip', () => {
-  it('renders with hourly and daily data', () => {
-    const tree = TestRenderer.create(
-      <HourlyStrip hourly={mockHourly()} daily={mockDaily()} unit="C" />,
-    )
+  it('renders with hourly and daily data', async () => {
+    let tree!: TestRenderer.ReactTestRenderer
+    await act(async () => {
+      tree = TestRenderer.create(
+        <HourlyStrip hourly={mockHourly()} daily={mockDaily()} unit="C" />,
+      )
+    })
     expect(tree.toJSON()).toBeTruthy()
     tree.unmount()
   })

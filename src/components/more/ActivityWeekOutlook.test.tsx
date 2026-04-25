@@ -1,5 +1,5 @@
 import React from 'react'
-import renderer from 'react-test-renderer'
+import renderer, { act } from 'react-test-renderer'
 import ActivityWeekOutlook from './ActivityWeekOutlook'
 import type { DayActivityOutlook } from '@/src/utils/activityWeekOutlook'
 
@@ -29,10 +29,12 @@ const MOCK_DAY: DayActivityOutlook = {
 }
 
 describe('ActivityWeekOutlook', () => {
-  it('renders day label and top activity', () => {
-    const json = JSON.stringify(
-      renderer.create(<ActivityWeekOutlook days={[MOCK_DAY]} />).toJSON(),
-    )
+  it('renders day label and top activity', async () => {
+    let tree!: renderer.ReactTestRenderer
+    await act(async () => {
+      tree = renderer.create(<ActivityWeekOutlook days={[MOCK_DAY]} />)
+    })
+    const json = JSON.stringify(tree.toJSON())
     expect(json).toMatch(/Today/)
     expect(json).toMatch(/Running/)
   })

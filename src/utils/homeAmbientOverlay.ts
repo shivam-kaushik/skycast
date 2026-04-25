@@ -12,9 +12,13 @@ export function homeScrimGradient(kind: AmbientVisualKind): {
 } {
   switch (kind) {
     case 'rain':
-    case 'thunder':
       return {
         colors: ['rgba(8,14,24,0.12)', 'rgba(8,14,24,0.40)', 'rgba(8,14,24,0.80)', BG],
+        locations: [0, 0.32, 0.66, 1],
+      }
+    case 'thunder':
+      return {
+        colors: ['rgba(8,14,24,0.22)', 'rgba(8,14,24,0.50)', 'rgba(8,14,24,0.85)', BG],
         locations: [0, 0.32, 0.66, 1],
       }
     case 'clearNight':
