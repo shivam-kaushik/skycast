@@ -11,7 +11,10 @@ let Purchases: typeof import('react-native-purchases').default | null = null
 async function getModule() {
   if (Purchases) return Purchases
   try {
-    const mod = await import('react-native-purchases')
+    // Guarded lazy require keeps the native SDK optional (e.g. Expo Go) and, unlike a dynamic
+    // import(), also loads under Jest's CommonJS runtime so this module is testable.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('react-native-purchases') as typeof import('react-native-purchases')
     Purchases = mod.default
     return Purchases
   } catch {

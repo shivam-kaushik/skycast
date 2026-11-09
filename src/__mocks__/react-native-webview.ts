@@ -1,5 +1,11 @@
 import React from 'react'
-import { View } from 'react-native'
 
-const WebView = View
+export const mockInjectJavaScript = jest.fn()
+
+const WebView = React.forwardRef((_props, ref) => {
+  React.useImperativeHandle(ref, () => ({
+    injectJavaScript: mockInjectJavaScript,
+  }))
+  return null
+})
 export default WebView

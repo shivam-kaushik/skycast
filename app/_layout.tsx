@@ -5,12 +5,13 @@ import { useFonts } from 'expo-font'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useLocation } from '@/src/hooks/useLocation'
 import { usePremiumStore } from '@/src/store/premiumStore'
 import { useAuthStore } from '@/src/store/authStore'
 import { initPurchases, checkPremiumStatus, loginUser } from '@/src/api/purchases'
 import { supabase } from '@/src/api/supabase'
+import { logger } from '@/src/utils/logger'
 import 'react-native-reanimated'
 
 export { ErrorBoundary } from 'expo-router'
@@ -21,7 +22,23 @@ export const unstable_settings = {
 
 SplashScreen.preventAutoHideAsync()
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      logger.error('react-query', error instanceof Error ? error : 'Query failed', {
+        queryKey: query.queryKey,
+        queryHash: query.queryHash,
+      })
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      logger.error('react-query.mutation', error instanceof Error ? error : 'Mutation failed', {
+        mutationKey: mutation.options.mutationKey ?? null,
+      })
+    },
+  }),
+})
 
 function LocationBootstrap(): null {
   useLocation()
@@ -55,7 +72,9 @@ function PremiumBootstrap(): null {
       await setPremium(isPremium)
       if (isPremium) await loadQueryCount()
     }
-    bootstrap()
+    bootstrap().catch((error) => {
+      logger.error('app.bootstrap', error instanceof Error ? error : 'Premium/auth bootstrap failed')
+    })
 
     // Keep auth store in sync with Supabase session changes (token refresh, sign-out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -75,7 +94,10 @@ export default function RootLayout() {
   })
 
   useEffect(() => {
-    if (error) throw error
+    if (error) {
+      logger.error('app.fonts', error, { message: 'font loading failed' })
+      throw error
+    }
   }, [error])
 
   useEffect(() => {

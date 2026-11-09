@@ -9,9 +9,8 @@ import { Ionicons } from '@expo/vector-icons'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin'
 import { supabase } from '@/src/api/supabase'
-import { loginUser } from '@/src/api/purchases'
 import { useAuthStore } from '@/src/store/authStore'
-import { usePremiumStore } from '@/src/store/premiumStore'
+import { syncPurchasesForUser } from '@/src/utils/postSignIn'
 import {
   BG, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   GLASS_BG, GHOST_BORDER, DANGER, GOOD,
@@ -24,10 +23,31 @@ GoogleSignin.configure({
   scopes: ['email', 'profile'],
 })
 
+/**
+ * Apple only shares the user's name on their very first sign-in, so persist it immediately.
+ * Best effort: a missing display name must never block signing in.
+ */
+async function saveAppleName(fullName: AppleAuthentication.AppleAuthenticationFullName | null): Promise<void> {
+  if (!fullName) return
+  const { givenName, middleName, familyName } = fullName
+  const name = [givenName, middleName, familyName].filter(Boolean).join(' ')
+  if (!name) return
+  try {
+    await supabase.auth.updateUser({
+      data: {
+        full_name: name,
+        ...(givenName ? { given_name: givenName } : {}),
+        ...(familyName ? { family_name: familyName } : {}),
+      },
+    })
+  } catch {
+    // ignore — see above
+  }
+}
+
 export default function LoginScreen() {
   const router = useRouter()
   const { setSession } = useAuthStore()
-  const { setPremium, loadQueryCount } = usePremiumStore()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,9 +58,7 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null)
 
   async function afterSession(userId: string) {
-    const isPremium = await loginUser(userId)
-    await setPremium(isPremium)
-    if (isPremium) await loadQueryCount()
+    await syncPurchasesForUser(userId)
     router.back()
   }
 
@@ -116,13 +134,18 @@ export default function LoginScreen() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       })
+      if (!credential.identityToken) {
+        setError('Apple sign-in failed — no identity token returned.')
+        return
+      }
       const { data, error: authError } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
-        token: credential.identityToken ?? '',
+        token: credential.identityToken,
       })
       if (authError) { setError(authError.message); return }
       if (data.session) {
         setSession(data.session)
+        await saveAppleName(credential.fullName)
         await afterSession(data.session.user.id)
       }
     } catch (e: unknown) {

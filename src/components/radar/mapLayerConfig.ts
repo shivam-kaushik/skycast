@@ -6,7 +6,7 @@ export interface MapTileConfig {
 }
 
 export const MAP_TILE_CONFIG: Record<MapLayer, MapTileConfig[]> = {
-  /** Model precipitation field — `valid_times` include forecast hours (use for “next 12h” animation). */
+  /** Model precipitation field — `valid_times` include forecast hours (use for "next 12h" animation). */
   precipitation: [
     { model: 'ecmwf_ifs', variable: 'precipitation' },
     { model: 'dwd_icon', variable: 'precipitation' },
@@ -28,9 +28,19 @@ export const MAP_TILE_CONFIG: Record<MapLayer, MapTileConfig[]> = {
   ],
 }
 
+/**
+ * Open-Meteo's spatial tile metadata is served from their public AWS Open Data bucket.
+ * The old `map-tiles.open-meteo.com` CDN host no longer resolves — this bucket is the
+ * live replacement and needs no credentials (same free/keyless model as the rest of the API).
+ */
+const DATA_SPATIAL_BASE_URL = 'https://openmeteo.s3.amazonaws.com/data_spatial'
+
+export const FREE_MAP_BASE_URLS = {
+  standard: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+}
+
 export function getTileMetadataUrls(layer: MapLayer): string[] {
   return MAP_TILE_CONFIG[layer].map(
-    (config) =>
-      `https://map-tiles.open-meteo.com/data_spatial/${config.model}/latest.json?variable=${config.variable}`,
+    (config) => `${DATA_SPATIAL_BASE_URL}/${config.model}/latest.json?variable=${config.variable}`,
   )
 }

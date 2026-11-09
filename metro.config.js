@@ -16,4 +16,12 @@ const fileMapCacheDirectory = path.join(projectRoot, '.metro', 'file-map')
 fs.mkdirSync(fileMapCacheDirectory, { recursive: true })
 config.fileMapCacheDirectory = fileMapCacheDirectory
 
+// Git worktrees under .worktrees/ carry their own node_modules; crawling them
+// exhausts watchers/memory on Windows and is never part of this app's bundle.
+const existingBlockList = config.resolver.blockList
+config.resolver.blockList = [
+  ...(Array.isArray(existingBlockList) ? existingBlockList : existingBlockList ? [existingBlockList] : []),
+  /[\\/]\.worktrees[\\/].*/,
+]
+
 module.exports = config

@@ -10,7 +10,7 @@ import { validateOpenMeteoValidTimesPayload } from '@/src/utils/openMeteoMapTile
 import { buildFullModelDisplayFrameIndices, sanitizeOmFrameIndices } from '@/src/utils/radarFrameIndexes'
 
 const PRECIP_META =
-  'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=precipitation'
+  'https://openmeteo.s3.amazonaws.com/data_spatial/ecmwf_ifs/latest.json?variable=precipitation'
 
 const runLive = process.env.OM_LIVE_MAP_TEST === '1'
 

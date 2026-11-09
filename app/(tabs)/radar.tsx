@@ -343,7 +343,7 @@ export default function RadarScreen() {
           </View>
         </View>
 
-        {viewMode === 'map' && activeLayer !== 'temperature' && activeLayer !== 'air' && (
+        {viewMode === 'map' && totalFrames > 1 && (
           <View style={styles.timelineCard} pointerEvents="auto">
             <View style={styles.timelineTopRow}>
               <TouchableOpacity

@@ -18,6 +18,12 @@ const SecureStoreAdapter = {
     const chunkSize = 1800
     const chunks = value.match(new RegExp(`.{1,${chunkSize}}`, 'g')) ?? [value]
     await Promise.all(chunks.map((chunk, i) => SecureStore.setItemAsync(`${key}.${i}`, chunk)))
+    // A shorter value than before leaves stale trailing chunks that getItem would glue back on.
+    let stale = chunks.length
+    while ((await SecureStore.getItemAsync(`${key}.${stale}`)) !== null) {
+      await SecureStore.deleteItemAsync(`${key}.${stale}`)
+      stale++
+    }
   },
   removeItem: async (key: string): Promise<void> => {
     let i = 0

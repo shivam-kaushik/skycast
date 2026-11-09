@@ -1,4 +1,5 @@
 import type { CurrentWeather, HourlyWeather, DailyWeather } from '@/src/types/weather'
+import { logger } from '@/src/utils/logger'
 
 interface OpenMeteoCurrentRaw {
   temperature_2m: number
@@ -157,17 +158,27 @@ export async function fetchWeather(lat: number, lon: number): Promise<WeatherDat
   })
 
   const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`
-  const response = await fetch(url)
 
-  if (!response.ok) {
-    throw new Error(`Weather API error: ${response.status} ${response.statusText}`)
-  }
+  try {
+    const response = await fetch(url)
 
-  const data = (await response.json()) as OpenMeteoResponse
+    if (!response.ok) {
+      const err = new Error(`Weather API error: ${response.status} ${response.statusText}`)
+      logger.error('weather.api', err, { url, status: response.status, statusText: response.statusText })
+      throw err
+    }
 
-  return {
-    current: mapCurrent(data.current),
-    hourly: mapHourly(data.hourly),
-    daily: mapDaily(data.daily),
+    const data = (await response.json()) as OpenMeteoResponse
+    logger.info('weather.api', 'weather payload loaded', { url, lat, lon, points: data?.hourly?.time?.length ?? 0 })
+
+    return {
+      current: mapCurrent(data.current),
+      hourly: mapHourly(data.hourly),
+      daily: mapDaily(data.daily),
+    }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error('Unknown weather fetch failure')
+    logger.error('weather.api', err, { url, lat, lon })
+    throw err
   }
 }

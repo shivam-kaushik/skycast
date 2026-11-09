@@ -3,6 +3,7 @@ import { Platform } from 'react-native'
 import Constants from 'expo-constants'
 import * as Location from 'expo-location'
 import { useLocationStore } from '@/src/store/locationStore'
+import { logger } from '@/src/utils/logger'
 
 /**
  * Web E2E: fixed coords. Checks `navigator.webdriver`, storage, URL, cookie, `extra`, and env.
@@ -100,6 +101,7 @@ export function useLocation(): UseLocationResult {
         }
 
         if (peekSkycastWebE2e()) {
+          logger.info('location.bootstrap', 'web e2e detected; using fixed coordinates', { lat: 37.7749, lon: -122.4194 })
           if (!cancelled) {
             useLocationStore.setState({
               lat: 37.7749,
@@ -118,6 +120,7 @@ export function useLocation(): UseLocationResult {
         }
 
         if (isManualSelection) {
+          logger.info('location.bootstrap', 'manual selection active; skipping device lookup')
           if (!cancelled) {
             setLocationUi({ locationLoading: false })
           }
@@ -127,6 +130,7 @@ export function useLocation(): UseLocationResult {
         const { status } = await Location.requestForegroundPermissionsAsync()
 
         if (status !== 'granted') {
+          logger.warn('location.permission', 'foreground permission denied', { status })
           if (!cancelled) {
             setLocationUi({
               locationPermissionDenied: true,
@@ -142,6 +146,7 @@ export function useLocation(): UseLocationResult {
         })
 
         const { latitude, longitude } = position.coords
+        logger.info('location.lookup', 'device position received', { latitude, longitude })
 
         let geocodeResults: Awaited<ReturnType<typeof Location.reverseGeocodeAsync>> = []
         try {
@@ -149,8 +154,8 @@ export function useLocation(): UseLocationResult {
             latitude,
             longitude,
           })
-        } catch {
-          // Web: expo-location throws (no host geocoder). Native can still fail; continue with coords.
+        } catch (geocodeError) {
+          logger.warn('location.geocode', geocodeError instanceof Error ? geocodeError.message : 'reverse geocode failed', { latitude, longitude })
           geocodeResults = []
         }
 
@@ -166,10 +171,12 @@ export function useLocation(): UseLocationResult {
           recordDeviceLocation(latitude, longitude, cityName)
           setLocation(latitude, longitude, cityName)
           setLocationUi({ locationPermissionDenied: false, locationError: null, locationLoading: false })
+          logger.info('location.lookup', 'location stored successfully', { latitude, longitude, cityName })
         }
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : 'Failed to get location'
+          logger.error('location.lookup', message, { isManualSelection, status: 'error' })
           setLocationUi({ locationError: message, locationLoading: false })
         }
       }

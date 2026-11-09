@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getTileMetadataUrls, type MapLayer } from '@/src/components/radar/mapLayerConfig'
 import { validateOpenMeteoValidTimesPayload } from '@/src/utils/openMeteoMapTileValidation'
+import { logger } from '@/src/utils/logger'
 
 const STALE_TIME = 5 * 60 * 1000
 const REFETCH_INTERVAL = 10 * 60 * 1000
@@ -63,15 +64,27 @@ function getValidTimesLength(json: TileMetadataJson): number {
 }
 
 async function fetchTileMetadata(url: string): Promise<{ validTimes: string[]; referenceTime: string }> {
-  const res = await fetch(url)
-  if (!res.ok) return { validTimes: [], referenceTime: '' }
-  const json: unknown = await res.json()
-  if (!validateOpenMeteoValidTimesPayload(json).ok) return { validTimes: [], referenceTime: '' }
-  const parsed = json as TileMetadataJson
-  const validTimes = parseValidTimes(parsed)
-  // reference_time can be ISO string or Unix seconds/ms — normalise the same way as valid_times
-  const referenceTime = validTimeToIso(parsed.reference_time)
-  return { validTimes, referenceTime }
+  try {
+    const res = await fetch(url)
+    if (!res.ok) {
+      logger.warn('map.metadata', 'tile metadata request failed', { url, status: res.status, statusText: res.statusText })
+      return { validTimes: [], referenceTime: '' }
+    }
+    const json: unknown = await res.json()
+    if (!validateOpenMeteoValidTimesPayload(json).ok) {
+      logger.warn('map.metadata', 'tile metadata payload rejected', { url, validation: 'invalid-shape' })
+      return { validTimes: [], referenceTime: '' }
+    }
+    const parsed = json as TileMetadataJson
+    const validTimes = parseValidTimes(parsed)
+    const referenceTime = validTimeToIso(parsed.reference_time)
+    logger.info('map.metadata', 'tile metadata loaded', { url, count: validTimes.length })
+    return { validTimes, referenceTime }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error('Unknown map metadata failure')
+    logger.error('map.metadata', err, { url })
+    return { validTimes: [], referenceTime: '' }
+  }
 }
 
 async function fetchValidTimesLength(url: string): Promise<number> {
@@ -93,16 +106,19 @@ async function selectFirstNonEmptySource(
   return null
 }
 
-/** Prefer `cloud_cover` from the same spatial model as the selected tile (shared `valid_times`). */
+/**
+ * Prefer `cloud_cover` from the same spatial model as the selected tile (shared `valid_times`).
+ * Served from Open-Meteo's public AWS bucket — the old `map-tiles.open-meteo.com` CDN host is dead.
+ */
 function cloudMetadataCandidateUrls(tileUrl: string): string[] {
   const m = tileUrl.match(/data_spatial\/([^/]+)\//)
   const paired =
     m?.[1] != null
-      ? `https://map-tiles.open-meteo.com/data_spatial/${m[1]}/latest.json?variable=cloud_cover`
+      ? `https://openmeteo.s3.amazonaws.com/data_spatial/${m[1]}/latest.json?variable=cloud_cover`
       : null
   const fallbacks = [
-    'https://map-tiles.open-meteo.com/data_spatial/ecmwf_ifs/latest.json?variable=cloud_cover',
-    'https://map-tiles.open-meteo.com/data_spatial/dwd_icon/latest.json?variable=cloud_cover',
+    'https://openmeteo.s3.amazonaws.com/data_spatial/ecmwf_ifs/latest.json?variable=cloud_cover',
+    'https://openmeteo.s3.amazonaws.com/data_spatial/dwd_icon/latest.json?variable=cloud_cover',
   ]
   const out: string[] = []
   if (paired) out.push(paired)
@@ -130,11 +146,18 @@ export function useOmeteoMapTileMetadata(layer: MapLayer, options?: { enabled?: 
     retry: RETRY,
     queryFn: async () => {
       const tileCandidates = getTileMetadataUrls(layer)
+      logger.info('map.metadata', 'requesting tile metadata', { layer, candidateCount: tileCandidates.length })
       const selectedTile = await selectFirstNonEmptySource(tileCandidates)
-      if (!selectedTile) return null
+      if (!selectedTile) {
+        logger.warn('map.metadata', 'no usable tile source found', { layer, candidates: tileCandidates })
+        return null
+      }
 
       const selectedCloud = await selectFirstNonEmptySource(cloudMetadataCandidateUrls(selectedTile.url))
-      if (!selectedCloud) return null
+      if (!selectedCloud) {
+        logger.warn('map.metadata', 'no usable cloud source found', { layer, tileUrl: selectedTile.url })
+        return null
+      }
 
       if (layer === 'wind') {
         const windVectorSourceUrl = deriveWindVectorSourceUrl(selectedTile.url)

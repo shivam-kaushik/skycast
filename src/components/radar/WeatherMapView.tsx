@@ -11,11 +11,8 @@ import {
   buildRadarDisplayFrameIndexes,
   indexOfFrameNearestToNow,
   sanitizeOmFrameIndices,
-  singleApiIndexNearestInTimeline,
 } from '@/src/utils/radarFrameIndexes'
 
-/** No timeline UI — one map frame nearest to now (see radar screen). */
-const STATIC_MAP_LAYERS: MapLayer[] = ['temperature', 'air']
 export type { MapLayer } from '@/src/components/radar/mapLayerConfig'
 
 export interface WeatherMapHandle {
@@ -58,9 +55,9 @@ export function buildMapHTML(
     windVectorValidTimesLength?: number
     /** Open-Meteo `valid_times_*` indices (chronological order), already subsampled. */
     frameIndices: number[]
-    /** Per-animation-frame indices into the cloud layer’s `valid_times` (aligned by timestamp). */
+    /** Per-animation-frame indices into the cloud layer's `valid_times` (aligned by timestamp). */
     cloudFrameIndices: number[]
-    /** Start animation on the frame whose valid time is nearest to load time (usually “now”). */
+    /** Start animation on the frame whose valid time is nearest to load time (usually "now"). */
     initialFrameIndex: number
     /**
      * Pre-resolved `.om` tile file URLs (one per animation frame). When provided these are passed
@@ -336,24 +333,6 @@ export function buildMapHTML(
       }, 1200);
     }
 
-    function buildFrameIndexes(totalCount, frameCount) {
-      if (totalCount <= 0 || frameCount <= 0) return [];
-      if (totalCount <= frameCount) {
-        var dense = [];
-        for (var i = 0; i < totalCount; i++) dense.push(i);
-        return dense;
-      }
-      var indexes = [];
-      var step = (totalCount - 1) / (frameCount - 1);
-      for (var j = 0; j < frameCount; j++) {
-        var idx = Math.round(j * step);
-        if (indexes.length === 0 || indexes[indexes.length - 1] !== idx) {
-          indexes.push(idx);
-        }
-      }
-      return indexes;
-    }
-
     var adapter = omAdapter;
     if (!adapter) {
       try {
@@ -521,8 +500,8 @@ export function buildMapHTML(
       })(cl, fi, nextFi);
     }
 
-    // Fallback: if no tileload events fire within 4 s (e.g. static temp/air layers that load
-    // synchronously), start animation anyway so the UI doesn't stay blank indefinitely.
+    // Fallback: if no tileload events fire within 4 s, start animation anyway so the UI
+    // doesn't stay blank indefinitely.
     setTimeout(function() {
       if (!animationStarted) {
         animationStarted = true;
@@ -553,9 +532,9 @@ export function buildMapHTML(
   }
 
   // ── ANIMATED WEATHER LAYERS ────────────────────────────────────
-  if (LAYER === 'temperature' || LAYER === 'wind' || LAYER === 'air' || LAYER === 'precipitation') {
-    setupAnimatedOverlay();
-  }
+  // All four layers (precipitation, temperature, wind, air) share the same real
+  // Open-Meteo tile timeline and scrubber — matching Apple Weather's consistent UX.
+  setupAnimatedOverlay();
 
   window.onerror = function (message, source, lineno, colno, error) {
     try {
@@ -651,8 +630,6 @@ export function buildMapHTML(
 </html>`
 }
 
-/** Precipitation uses the same Open-Meteo map tiles as other layers (see `buildMapHTML`). */
-
 /**
  * Convert a `latest.json?variable=X` metadata URL + run/valid times into the direct `.om` tile
  * data file URL. Passing this to `createTileLayer` instead of the `latest.json?time_step=N` form
@@ -685,7 +662,7 @@ function buildOmFileUrl(
  * Total animated tile layers budget.
  * WASM heap OOM observed at 10+ concurrent layers. Keep to 4 max total:
  * With cloud overlay: 2 precip + 2 cloud = 4 layers (safe margin below OOM threshold).
- * Without cloud overlay: up to 4 precipitation frames for the 12-hour window.
+ * Without cloud overlay: up to 4 frames for the 12-hour window.
  */
 const MAX_MAP_FRAMES = 4
 
@@ -768,7 +745,7 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
   }
 
   const nowMs = Date.now()
-  const useStaticSingleFrame = STATIC_MAP_LAYERS.includes(layer)
+  // Every layer animates over the same "next 12h" window with the shared scrubber UI.
   const displayIndexes = (() => {
     const tl = tileMeta.tileValidTimesLength
     const finalize = (raw: number[]): number[] => {
@@ -777,19 +754,10 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
       const fallback = buildRadarDisplayFrameIndexes(tl, MAX_MAP_FRAMES)
       return sanitizeOmFrameIndices(fallback, tl)
     }
-
-    if (useStaticSingleFrame) {
-      const one = singleApiIndexNearestInTimeline(tileMeta.validTimes, nowMs)
-      if (one !== null) return finalize([one])
-      return finalize([0])
-    }
-    // Use the full frame budget for radar — cloud WASM overlay is disabled (OOM risk).
-    const frameCount = MAX_MAP_FRAMES
-    // Show only the next 12 hours from now — not the full model run which spans days.
-    return finalize(buildDisplayFrameApiIndices(tileMeta.validTimes, 12, frameCount, nowMs))
+    return finalize(buildDisplayFrameApiIndices(tileMeta.validTimes, 12, MAX_MAP_FRAMES, nowMs))
   })()
   const frameTimeLabels = displayIndexes.map((i) => tileMeta.validTimes[i] ?? '')
-  const initialFrameIndex = useStaticSingleFrame ? 0 : indexOfFrameNearestToNow(frameTimeLabels, nowMs)
+  const initialFrameIndex = indexOfFrameNearestToNow(frameTimeLabels, nowMs)
   const cloudFrameIndices = buildCloudFrameIndicesForAnimation(
     displayIndexes,
     frameTimeLabels,
@@ -886,12 +854,6 @@ const WeatherMapView = forwardRef<WeatherMapHandle, WeatherMapViewProps>((props,
             }
             if (msg.type === 'timeline' && Array.isArray(msg.times)) {
               onTimelineReady?.(msg.times)
-            }
-            if (msg.type === 'cdbg') {
-              console.log('[cloud]', JSON.stringify(msg))
-            }
-            if (msg.type === 'nlog') {
-              console.log('[net404]', JSON.stringify(msg))
             }
             if (msg.type === 'error') {
               setMapLoading(false)

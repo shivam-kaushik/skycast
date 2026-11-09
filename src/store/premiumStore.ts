@@ -36,20 +36,15 @@ export const usePremiumStore = create<PremiumStore>((set, get) => ({
   isPaywallVisible: false,
   isHydrated: false,
 
-  setPremium: async (value) => {
-    set({ isPremium: value })
-    await AsyncStorage.setItem(PREMIUM_STATUS_KEY, value ? '1' : '0')
+  setPremium: async (_value) => {
+    // Always premium in personal edition — ignore the value
+    set({ isPremium: true })
   },
 
-  showPaywall: () => set({ isPaywallVisible: true }),
+  showPaywall: () => {},
   hidePaywall: () => set({ isPaywallVisible: false }),
 
-  canQuery: () => {
-    const { isPremium, isDevUnlocked, queriesUsedToday, queryDate } = get()
-    if (!isPremium && !isDevUnlocked) return false
-    if (queryDate !== todayStr()) return true
-    return queriesUsedToday < MAX_DAILY_QUERIES
-  },
+  canQuery: () => true,
 
   incrementQuery: async () => {
     const today = todayStr()
@@ -75,23 +70,8 @@ export const usePremiumStore = create<PremiumStore>((set, get) => ({
 
   // Call once on app start — restores persisted premium + dev unlock before RevenueCat responds
   hydrate: async () => {
-    const [premiumStored, devUnlockStored, storedCount, storedDate] = await Promise.all([
-      AsyncStorage.getItem(PREMIUM_STATUS_KEY),
-      AsyncStorage.getItem(DEV_UNLOCK_KEY),
-      AsyncStorage.getItem(QUERY_COUNT_KEY),
-      AsyncStorage.getItem(QUERY_DATE_KEY),
-    ])
-    const today = todayStr()
-    const queriesUsedToday =
-      storedDate === today && storedCount !== null ? parseInt(storedCount, 10) : 0
-
-    set({
-      isPremium: premiumStored === '1',
-      isDevUnlocked: devUnlockStored === '1',
-      queriesUsedToday,
-      queryDate: today,
-      isHydrated: true,
-    })
+    // Personal edition — always fully unlocked
+    set({ isPremium: true, isDevUnlocked: true, isHydrated: true })
   },
 
   // Toggle developer test mode — activated via secret tap gesture in More screen

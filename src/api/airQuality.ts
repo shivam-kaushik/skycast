@@ -1,4 +1,5 @@
 import type { AirQualityData } from '@/src/types/weather'
+import { logger } from '@/src/utils/logger'
 
 interface AirQualityCurrentRaw {
   pm10: number
@@ -60,37 +61,47 @@ export async function fetchAirQuality(lat: number, lon: number): Promise<AirQual
   })
 
   const url = `https://air-quality-api.open-meteo.com/v1/air-quality?${params.toString()}`
-  const response = await fetch(url)
 
-  if (!response.ok) {
-    throw new Error(`Air quality API error: ${response.status} ${response.statusText}`)
-  }
+  try {
+    const response = await fetch(url)
 
-  const data = (await response.json()) as AirQualityApiResponse
+    if (!response.ok) {
+      const err = new Error(`Air quality API error: ${response.status} ${response.statusText}`)
+      logger.error('air.api', err, { url, status: response.status, statusText: response.statusText })
+      throw err
+    }
 
-  return {
-    current: {
-      pm10: data.current.pm10,
-      pm25: data.current.pm2_5,
-      co: data.current.carbon_monoxide,
-      no2: data.current.nitrogen_dioxide,
-      ozone: data.current.ozone,
-      so2: data.current.sulphur_dioxide,
-      usAqi: data.current.us_aqi,
-      europeanAqi: data.current.european_aqi,
-    },
-    hourly: {
-      time: data.hourly.time,
-      pm10: data.hourly.pm10,
-      pm25: data.hourly.pm2_5,
-      no2: data.hourly.nitrogen_dioxide,
-      ozone: data.hourly.ozone,
-      alderPollen: data.hourly.alder_pollen,
-      birchPollen: data.hourly.birch_pollen,
-      grassPollen: data.hourly.grass_pollen,
-      mugwortPollen: data.hourly.mugwort_pollen,
-      olivePollen: data.hourly.olive_pollen,
-      ragweedPollen: data.hourly.ragweed_pollen,
-    },
+    const data = (await response.json()) as AirQualityApiResponse
+    logger.info('air.api', 'air quality payload loaded', { url, lat, lon, hourlyPoints: data?.hourly?.time?.length ?? 0 })
+
+    return {
+      current: {
+        pm10: data.current.pm10,
+        pm25: data.current.pm2_5,
+        co: data.current.carbon_monoxide,
+        no2: data.current.nitrogen_dioxide,
+        ozone: data.current.ozone,
+        so2: data.current.sulphur_dioxide,
+        usAqi: data.current.us_aqi,
+        europeanAqi: data.current.european_aqi,
+      },
+      hourly: {
+        time: data.hourly.time,
+        pm10: data.hourly.pm10,
+        pm25: data.hourly.pm2_5,
+        no2: data.hourly.nitrogen_dioxide,
+        ozone: data.hourly.ozone,
+        alderPollen: data.hourly.alder_pollen,
+        birchPollen: data.hourly.birch_pollen,
+        grassPollen: data.hourly.grass_pollen,
+        mugwortPollen: data.hourly.mugwort_pollen,
+        olivePollen: data.hourly.olive_pollen,
+        ragweedPollen: data.hourly.ragweed_pollen,
+      },
+    }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error('Unknown air quality fetch failure')
+    logger.error('air.api', err, { url, lat, lon })
+    throw err
   }
 }

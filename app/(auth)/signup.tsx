@@ -6,6 +6,8 @@ import {
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/src/api/supabase'
+import { AUTH_REDIRECTS } from '@/src/utils/authLinks'
+import { validateNewPassword } from '@/src/utils/passwordRules'
 import {
   BG, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   GLASS_BG, GHOST_BORDER, DANGER, GOOD,
@@ -23,15 +25,17 @@ export default function SignupScreen() {
   const [success, setSuccess] = useState(false)
 
   async function handleSignup() {
-    if (!email.trim() || !password) { setError('Please fill in all fields.'); return }
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
-    if (password !== confirmPassword) { setError('Passwords do not match.'); return }
+    if (!email.trim()) { setError('Please fill in all fields.'); return }
+    const passwordProblem = validateNewPassword(password, confirmPassword)
+    if (passwordProblem) { setError(passwordProblem); return }
 
     setLoading(true)
     setError(null)
     const { error: authError } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
+      // Without this the confirmation email links to the project's Site URL (localhost by default).
+      options: { emailRedirectTo: AUTH_REDIRECTS.confirmEmail },
     })
     setLoading(false)
     if (authError) { setError(authError.message); return }
