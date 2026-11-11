@@ -1,7 +1,7 @@
 import React from 'react'
 import { Switch } from 'react-native'
 import renderer, { act } from 'react-test-renderer'
-import type { User } from '@supabase/supabase-js'
+import type { AuthUser } from '@/src/api/auth'
 import MoreScreen from '@/app/(tabs)/more'
 import { useAuthStore } from '@/src/store/authStore'
 import { usePrefsStore } from '@/src/store/prefsStore'
@@ -13,7 +13,7 @@ jest.setTimeout(30_000)
 const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn() }
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }))
 
-jest.mock('@/src/api/supabase', () => ({ supabase: { auth: { signOut: jest.fn() } } }))
+jest.mock('@/src/api/auth', () => ({ signOut: jest.fn() }))
 jest.mock('@/src/api/purchases', () => ({ logoutUser: jest.fn() }))
 
 jest.mock('@/src/store/premiumStore', () => {
@@ -52,7 +52,7 @@ jest.mock('@/src/components/shared/PremiumGate', () => ({
   default: ({ children }: { children?: React.ReactNode }) => children ?? null,
 }))
 
-const { supabase } = jest.requireMock('@/src/api/supabase') as { supabase: { auth: { signOut: jest.Mock } } }
+const { signOut } = jest.requireMock('@/src/api/auth') as { signOut: jest.Mock }
 const { logoutUser } = jest.requireMock('@/src/api/purchases') as { logoutUser: jest.Mock }
 const { __premiumState: premium } = jest.requireMock('@/src/store/premiumStore') as {
   __premiumState: {
@@ -64,7 +64,7 @@ const { __premiumState: premium } = jest.requireMock('@/src/store/premiumStore')
   }
 }
 
-const USER = { id: 'user-1', email: 'person@example.com' } as User
+const USER: AuthUser = { id: 'user-1', email: 'person@example.com', displayName: null, emailVerified: true }
 const INITIAL_PREFS = usePrefsStore.getState()
 let trees: renderer.ReactTestRenderer[] = []
 
@@ -79,7 +79,7 @@ async function render(): Promise<renderer.ReactTestRenderer> {
 
 beforeEach(() => {
   Object.values(mockRouter).forEach((fn) => fn.mockReset())
-  supabase.auth.signOut.mockReset().mockResolvedValue(undefined)
+  signOut.mockReset().mockResolvedValue(undefined)
   logoutUser.mockReset().mockResolvedValue(undefined)
   premium.isPremium = false
   premium.isDevUnlocked = false
@@ -87,7 +87,7 @@ beforeEach(() => {
   premium.toggleDevUnlock.mockReset()
   premium.setPremium.mockReset().mockResolvedValue(undefined)
   usePrefsStore.setState(INITIAL_PREFS, true)
-  useAuthStore.setState({ user: null, session: null, isLoading: false })
+  useAuthStore.setState({ user: null, isLoading: false })
 })
 
 afterEach(() => {
@@ -122,7 +122,7 @@ describe('MoreScreen — account (signed out)', () => {
 
 describe('MoreScreen — account (signed in)', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: USER, session: null })
+    useAuthStore.setState({ user: USER })
   })
 
   it('shows the email and hides the sign-in options', async () => {
@@ -148,16 +148,15 @@ describe('MoreScreen — account (signed in)', () => {
     expect(hasText(tree, '★ Premium')).toBe(true)
   })
 
-  it('signs out of RevenueCat then Supabase, clears the session and revokes premium', async () => {
-    useAuthStore.setState({ user: USER, session: { access_token: 't' } as never })
+  it('signs out of RevenueCat then Firebase, clears the user and revokes premium', async () => {
+    useAuthStore.setState({ user: USER })
     const tree = await render()
 
     await pressText(tree, 'Sign Out')
 
     expect(logoutUser).toHaveBeenCalledTimes(1)
-    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1)
-    expect(logoutUser.mock.invocationCallOrder[0]).toBeLessThan(supabase.auth.signOut.mock.invocationCallOrder[0] ?? 0)
-    expect(useAuthStore.getState().session).toBeNull()
+    expect(signOut).toHaveBeenCalledTimes(1)
+    expect(logoutUser.mock.invocationCallOrder[0]).toBeLessThan(signOut.mock.invocationCallOrder[0] ?? 0)
     expect(useAuthStore.getState().user).toBeNull()
     expect(premium.setPremium).toHaveBeenCalledWith(false)
     expect(hasText(tree, 'Sign In')).toBe(true)

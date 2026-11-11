@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "524184143970",
+    "project_id": "skycast-f2fe0",
+    "storage_bucket": "skycast-f2fe0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524184143970:android:1624f50be60ac2de6fe93b",
+        "android_client_info": {
+          "package_name": "com.shivamkaushik.skycast"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "524184143970-6ld71e6220qu8km38h5aqg6l1f85qpp8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shivamkaushik.skycast",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "524184143970-61cuq2ra36lvg2nqjq1th29jdtdcmaba.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSx_q88QVWVjC6q4OxltTdseKzVa9C1QQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "524184143970-61cuq2ra36lvg2nqjq1th29jdtdcmaba.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "524184143970-56i0h1cd0isulbi3fdd6h9qds24vc3ag.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shivamkaushik.skycast"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

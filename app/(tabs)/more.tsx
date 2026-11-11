@@ -1,4 +1,4 @@
-import { supabase } from "@/src/api/supabase";
+import { signOut } from "@/src/api/auth";
 import { logoutUser } from "@/src/api/purchases";
 import PersonaSwitcher from "@/src/components/home/PersonaSwitcher";
 import ActivityWeekOutlook from "@/src/components/more/ActivityWeekOutlook";
@@ -207,15 +207,15 @@ export default function MoreScreen() {
   const persona = usePersonaStore((s) => s.persona);
   const { loadQueryCount, isPremium, isDevUnlocked, toggleDevUnlock, setPremium } =
     usePremiumStore();
-  const { user, setSession } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const [devTapCount, setDevTapCount] = React.useState(0);
   const [signingOut, setSigningOut] = React.useState(false);
 
   async function handleSignOut() {
     setSigningOut(true);
     await logoutUser();
-    await supabase.auth.signOut();
-    setSession(null);
+    await signOut();
+    setUser(null);
     await setPremium(false);
     setSigningOut(false);
   }

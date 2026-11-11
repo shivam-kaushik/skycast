@@ -5,8 +5,9 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '@/src/api/supabase'
-import { AUTH_REDIRECTS } from '@/src/utils/authLinks'
+import { signUpWithEmail } from '@/src/api/auth'
+import { useAuthStore } from '@/src/store/authStore'
+import { syncPurchasesForUser } from '@/src/utils/postSignIn'
 import { validateNewPassword } from '@/src/utils/passwordRules'
 import {
   BG, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
@@ -16,6 +17,7 @@ import { FONT_BOLD, FONT_MEDIUM, FONT_REGULAR, FONT_SEMIBOLD } from '@/src/theme
 
 export default function SignupScreen() {
   const router = useRouter()
+  const setUser = useAuthStore((st) => st.setUser)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -31,14 +33,12 @@ export default function SignupScreen() {
 
     setLoading(true)
     setError(null)
-    const { error: authError } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      // Without this the confirmation email links to the project's Site URL (localhost by default).
-      options: { emailRedirectTo: AUTH_REDIRECTS.confirmEmail },
-    })
+    // Creating the account also signs the user in.
+    const result = await signUpWithEmail(email.trim().toLowerCase(), password)
+    if (!result.ok) { setLoading(false); setError(result.error); return }
+    setUser(result.user)
+    await syncPurchasesForUser(result.user.id)
     setLoading(false)
-    if (authError) { setError(authError.message); return }
     setSuccess(true)
   }
 
@@ -48,13 +48,13 @@ export default function SignupScreen() {
         <StatusBar barStyle="light-content" />
         <View style={styles.successCenter}>
           <Ionicons name="checkmark-circle" size={64} color={GOOD} />
-          <Text style={styles.successTitle}>Check your email</Text>
+          <Text style={styles.successTitle}>You're signed in</Text>
           <Text style={styles.successSub}>
-            We sent a confirmation link to {email.trim().toLowerCase()}.{'\n'}
-            Click it to activate your account, then sign in.
+            We sent a verification link to {email.trim().toLowerCase()}.{'\n'}
+            Tap it whenever you're ready to confirm your email.
           </Text>
-          <Pressable style={styles.primaryBtn} onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.primaryBtnText}>Back to Sign In</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => router.back()}>
+            <Text style={styles.primaryBtnText}>Continue</Text>
           </Pressable>
         </View>
       </View>

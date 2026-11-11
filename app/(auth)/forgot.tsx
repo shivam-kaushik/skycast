@@ -5,8 +5,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '@/src/api/supabase'
-import { AUTH_REDIRECTS } from '@/src/utils/authLinks'
+import { sendPasswordReset } from '@/src/api/auth'
 import {
   BG, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   GLASS_BG, GHOST_BORDER, DANGER, GOOD,
@@ -24,12 +23,9 @@ export default function ForgotScreen() {
     if (!email.trim()) { setError('Please enter your email address.'); return }
     setLoading(true)
     setError(null)
-    const { error: authError } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: AUTH_REDIRECTS.resetPassword },
-    )
+    const result = await sendPasswordReset(email.trim().toLowerCase())
     setLoading(false)
-    if (authError) { setError(authError.message); return }
+    if (!result.ok) { setError(result.error); return }
     setSent(true)
   }
 
@@ -42,7 +38,7 @@ export default function ForgotScreen() {
           <Text style={styles.successTitle}>Check your email</Text>
           <Text style={styles.successSub}>
             We sent a password reset link to {email.trim().toLowerCase()}.{'\n'}
-            Click it to set a new password.
+            Click it to set a new password, then sign in here.
           </Text>
           <Pressable style={styles.primaryBtn} onPress={() => router.replace('/(auth)/login')}>
             <Text style={styles.primaryBtnText}>Back to Sign In</Text>

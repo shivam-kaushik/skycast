@@ -67,7 +67,7 @@ export async function restorePurchases(): Promise<boolean> {
   }
 }
 
-// Call on user sign-in — links RevenueCat to the Supabase user ID for cross-device sync
+// Call on user sign-in — links RevenueCat to the Firebase user ID for cross-device sync
 export async function loginUser(userId: string): Promise<boolean> {
   const mod = await getModule()
   if (!mod) return false

@@ -12,8 +12,12 @@ const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn() }
 
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }))
 
-jest.mock('@/src/api/supabase', () => ({
-  supabase: { auth: { signInWithPassword: jest.fn(), signInWithIdToken: jest.fn(), updateUser: jest.fn() } },
+jest.mock('@/src/api/auth', () => ({
+  signInWithEmail: jest.fn(),
+  signInWithGoogle: jest.fn(),
+  signInWithApple: jest.fn(),
+  saveDisplayName: jest.fn(),
+  createAppleNonce: jest.fn(),
 }))
 
 jest.mock('@/src/api/purchases', () => ({ loginUser: jest.fn() }))
@@ -38,16 +42,18 @@ jest.mock('expo-apple-authentication', () => ({
   AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
 }))
 
-const { supabase } = jest.requireMock('@/src/api/supabase') as {
-  supabase: { auth: { signInWithPassword: jest.Mock; signInWithIdToken: jest.Mock; updateUser: jest.Mock } }
-}
+const auth = jest.requireMock('@/src/api/auth') as Record<
+  'signInWithEmail' | 'signInWithGoogle' | 'signInWithApple' | 'saveDisplayName' | 'createAppleNonce',
+  jest.Mock
+>
 const { loginUser } = jest.requireMock('@/src/api/purchases') as { loginUser: jest.Mock }
 const { GoogleSignin } = jest.requireMock('@react-native-google-signin/google-signin') as {
   GoogleSignin: Record<'configure' | 'hasPlayServices' | 'signIn' | 'getTokens', jest.Mock>
 }
 const AppleAuthentication = jest.requireMock('expo-apple-authentication') as { signInAsync: jest.Mock }
 
-const SESSION = { access_token: 'tok', user: { id: 'user-1', email: 'a@b.co' } }
+const USER = { id: 'user-1', email: 'a@b.co', displayName: null, emailVerified: true }
+const SIGNED_IN = { ok: true, user: USER }
 const restores: Array<() => void> = []
 
 function setPlatform(os: 'ios' | 'android'): void {
@@ -67,14 +73,16 @@ async function render(): Promise<renderer.ReactTestRenderer> {
 }
 
 beforeEach(() => {
-  supabase.auth.signInWithPassword.mockReset()
-  supabase.auth.signInWithIdToken.mockReset()
-  supabase.auth.updateUser.mockReset().mockResolvedValue({ data: {}, error: null })
+  auth.signInWithEmail.mockReset()
+  auth.signInWithGoogle.mockReset()
+  auth.signInWithApple.mockReset()
+  auth.saveDisplayName.mockReset().mockResolvedValue(undefined)
+  auth.createAppleNonce.mockReset().mockResolvedValue({ raw: 'raw-nonce', hashed: 'hashed-nonce' })
   loginUser.mockReset().mockResolvedValue(false)
   Object.values(GoogleSignin).forEach((fn) => fn.mockReset())
   AppleAuthentication.signInAsync.mockReset()
   Object.values(mockRouter).forEach((fn) => fn.mockReset())
-  useAuthStore.setState({ user: null, session: null, isLoading: false })
+  useAuthStore.setState({ user: null, isLoading: false })
 })
 
 afterEach(() => {
@@ -125,45 +133,44 @@ describe('LoginScreen — email and password', () => {
     await pressText(tree, 'Sign In')
 
     expect(hasText(tree, 'Please enter your email and password.')).toBe(true)
-    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled()
+    expect(auth.signInWithEmail).not.toHaveBeenCalled()
   })
 
-  it('signs in with a trimmed, lower-cased email, stores the session and dismisses', async () => {
-    supabase.auth.signInWithPassword.mockResolvedValue({ data: { session: SESSION }, error: null })
+  it('signs in with a trimmed, lower-cased email, stores the user and dismisses', async () => {
+    auth.signInWithEmail.mockResolvedValue(SIGNED_IN)
     const tree = await render()
     typeInto(tree, 'you@example.com', '  A@B.co ')
     typeInto(tree, '••••••••', 'hunter2hunter2')
 
     await pressText(tree, 'Sign In')
 
-    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'a@b.co', password: 'hunter2hunter2' })
-    expect(useAuthStore.getState().session).toBe(SESSION)
-    expect(useAuthStore.getState().user).toBe(SESSION.user)
+    expect(auth.signInWithEmail).toHaveBeenCalledWith('a@b.co', 'hunter2hunter2')
+    expect(useAuthStore.getState().user).toBe(USER)
     expect(loginUser).toHaveBeenCalledWith('user-1')
     expect(mockRouter.back).toHaveBeenCalled()
   })
 
   it('also submits from the keyboard on the password field', async () => {
-    supabase.auth.signInWithPassword.mockResolvedValue({ data: { session: SESSION }, error: null })
+    auth.signInWithEmail.mockResolvedValue(SIGNED_IN)
     const tree = await render()
     typeInto(tree, 'you@example.com', 'a@b.co')
     typeInto(tree, '••••••••', 'pw')
 
     await submitInput(tree, '••••••••')
 
-    expect(supabase.auth.signInWithPassword).toHaveBeenCalledTimes(1)
+    expect(auth.signInWithEmail).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the auth error and does not dismiss or store a session', async () => {
-    supabase.auth.signInWithPassword.mockResolvedValue({ data: { session: null }, error: { message: 'Invalid login credentials' } })
+  it('shows the auth error and does not dismiss or store a user', async () => {
+    auth.signInWithEmail.mockResolvedValue({ ok: false, error: 'Incorrect email or password.' })
     const tree = await render()
     typeInto(tree, 'you@example.com', 'a@b.co')
     typeInto(tree, '••••••••', 'wrong')
 
     await pressText(tree, 'Sign In')
 
-    expect(hasText(tree, 'Invalid login credentials')).toBe(true)
-    expect(useAuthStore.getState().session).toBeNull()
+    expect(hasText(tree, 'Incorrect email or password.')).toBe(true)
+    expect(useAuthStore.getState().user).toBeNull()
     expect(mockRouter.back).not.toHaveBeenCalled()
   })
 
@@ -185,38 +192,50 @@ describe('LoginScreen — Google', () => {
     GoogleSignin.getTokens.mockResolvedValue({ idToken })
   }
 
-  it('exchanges the Google ID token for a session and dismisses', async () => {
+  it('exchanges the Google ID token for a Firebase sign-in and dismisses', async () => {
     googleReady()
-    supabase.auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null })
+    auth.signInWithGoogle.mockResolvedValue(SIGNED_IN)
     const tree = await render()
 
     await pressText(tree, 'Google')
 
-    expect(supabase.auth.signInWithIdToken).toHaveBeenCalledWith({ provider: 'google', token: 'google-id-token' })
-    expect(useAuthStore.getState().session).toBe(SESSION)
+    expect(auth.signInWithGoogle).toHaveBeenCalledWith('google-id-token')
+    expect(useAuthStore.getState().user).toBe(USER)
     expect(loginUser).toHaveBeenCalledWith('user-1')
     expect(mockRouter.back).toHaveBeenCalled()
   })
 
-  it('reports a missing ID token without calling Supabase', async () => {
+  it('reports a missing ID token without calling Firebase', async () => {
     googleReady(null)
     const tree = await render()
 
     await pressText(tree, 'Google')
 
     expect(hasText(tree, 'Google sign-in failed — no ID token returned.')).toBe(true)
-    expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled()
+    expect(auth.signInWithGoogle).not.toHaveBeenCalled()
   })
 
-  it('shows the Supabase error', async () => {
+  it('shows the sign-in error', async () => {
     googleReady()
-    supabase.auth.signInWithIdToken.mockResolvedValue({ data: { session: null }, error: { message: 'Provider disabled' } })
+    auth.signInWithGoogle.mockResolvedValue({ ok: false, error: "This sign-in method isn't enabled yet." })
     const tree = await render()
 
     await pressText(tree, 'Google')
 
-    expect(hasText(tree, 'Provider disabled')).toBe(true)
+    expect(hasText(tree, "This sign-in method isn't enabled yet.")).toBe(true)
     expect(mockRouter.back).not.toHaveBeenCalled()
+  })
+
+  it('stays silent when the user closes the Google sheet', async () => {
+    GoogleSignin.hasPlayServices.mockResolvedValue(true)
+    GoogleSignin.signIn.mockResolvedValue({ type: 'cancelled', data: null })
+    const tree = await render()
+
+    await pressText(tree, 'Google')
+
+    expect(GoogleSignin.getTokens).not.toHaveBeenCalled()
+    expect(auth.signInWithGoogle).not.toHaveBeenCalled()
+    expect(hasText(tree, 'Google sign-in failed. Please try again.')).toBe(false)
   })
 
   it('stays silent when the user cancels', async () => {
@@ -257,22 +276,23 @@ describe('LoginScreen — Google', () => {
 describe('LoginScreen — Apple', () => {
   beforeEach(() => setPlatform('ios'))
 
-  it('exchanges the Apple identity token for a session and dismisses', async () => {
+  it('signs in with the Apple identity token and a nonce, then dismisses', async () => {
     AppleAuthentication.signInAsync.mockResolvedValue({ identityToken: 'apple-token' })
-    supabase.auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null })
+    auth.signInWithApple.mockResolvedValue(SIGNED_IN)
     const tree = await render()
 
     await pressText(tree, 'Apple')
 
-    expect(AppleAuthentication.signInAsync).toHaveBeenCalledWith({ requestedScopes: [0, 1] })
-    expect(supabase.auth.signInWithIdToken).toHaveBeenCalledWith({ provider: 'apple', token: 'apple-token' })
-    expect(useAuthStore.getState().session).toBe(SESSION)
+    // Apple gets the hashed nonce; Firebase gets the raw one.
+    expect(AppleAuthentication.signInAsync).toHaveBeenCalledWith({ requestedScopes: [0, 1], nonce: 'hashed-nonce' })
+    expect(auth.signInWithApple).toHaveBeenCalledWith('apple-token', 'raw-nonce')
+    expect(useAuthStore.getState().user).toBe(USER)
     expect(mockRouter.back).toHaveBeenCalled()
   })
 
-  it('shows the Supabase error', async () => {
+  it('shows the sign-in error', async () => {
     AppleAuthentication.signInAsync.mockResolvedValue({ identityToken: 'apple-token' })
-    supabase.auth.signInWithIdToken.mockResolvedValue({ data: { session: null }, error: { message: 'Invalid token' } })
+    auth.signInWithApple.mockResolvedValue({ ok: false, error: 'Invalid token' })
     const tree = await render()
 
     await pressText(tree, 'Apple')
@@ -280,22 +300,22 @@ describe('LoginScreen — Apple', () => {
     expect(hasText(tree, 'Invalid token')).toBe(true)
   })
 
-  it.each([[null], [undefined], ['']])('refuses to continue without an identity token (%p) and never contacts Supabase', async (identityToken) => {
+  it.each([[null], [undefined], ['']])('refuses to continue without an identity token (%p) and never contacts Firebase', async (identityToken) => {
     AppleAuthentication.signInAsync.mockResolvedValue({ identityToken })
     const tree = await render()
 
     await pressText(tree, 'Apple')
 
     expect(hasText(tree, 'Apple sign-in failed — no identity token returned.')).toBe(true)
-    expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled()
-    expect(useAuthStore.getState().session).toBeNull()
+    expect(auth.signInWithApple).not.toHaveBeenCalled()
+    expect(useAuthStore.getState().user).toBeNull()
     expect(mockRouter.back).not.toHaveBeenCalled()
   })
 
   describe('saving the name Apple shares', () => {
     const signedIn = (fullName: object | null): void => {
       AppleAuthentication.signInAsync.mockResolvedValue({ identityToken: 'apple-token', fullName })
-      supabase.auth.signInWithIdToken.mockResolvedValue({ data: { session: SESSION }, error: null })
+      auth.signInWithApple.mockResolvedValue(SIGNED_IN)
     }
 
     it('stores the full name in the user profile on first sign-in', async () => {
@@ -304,9 +324,7 @@ describe('LoginScreen — Apple', () => {
 
       await pressText(tree, 'Apple')
 
-      expect(supabase.auth.updateUser).toHaveBeenCalledWith({
-        data: { full_name: 'Ada King Lovelace', given_name: 'Ada', family_name: 'Lovelace' },
-      })
+      expect(auth.saveDisplayName).toHaveBeenCalledWith('Ada King Lovelace')
     })
 
     it('skips missing name parts', async () => {
@@ -315,7 +333,7 @@ describe('LoginScreen — Apple', () => {
 
       await pressText(tree, 'Apple')
 
-      expect(supabase.auth.updateUser).toHaveBeenCalledWith({ data: { full_name: 'Ada', given_name: 'Ada' } })
+      expect(auth.saveDisplayName).toHaveBeenCalledWith('Ada')
     })
 
     it.each([[null], [{ givenName: null, middleName: null, familyName: null }], [{}]])('does nothing when Apple sends no name (%j)', async (fullName) => {
@@ -324,7 +342,7 @@ describe('LoginScreen — Apple', () => {
 
       await pressText(tree, 'Apple')
 
-      expect(supabase.auth.updateUser).not.toHaveBeenCalled()
+      expect(auth.saveDisplayName).not.toHaveBeenCalled()
       expect(mockRouter.back).toHaveBeenCalled()
     })
 
@@ -334,40 +352,17 @@ describe('LoginScreen — Apple', () => {
 
       await pressText(tree, 'Apple')
 
-      expect(supabase.auth.updateUser.mock.invocationCallOrder[0]).toBeLessThan(mockRouter.back.mock.invocationCallOrder[0] ?? 0)
+      expect(auth.saveDisplayName.mock.invocationCallOrder[0]).toBeLessThan(mockRouter.back.mock.invocationCallOrder[0] ?? 0)
     })
 
     it('does not save a name when sign-in itself failed', async () => {
       AppleAuthentication.signInAsync.mockResolvedValue({ identityToken: 'apple-token', fullName: { givenName: 'Ada' } })
-      supabase.auth.signInWithIdToken.mockResolvedValue({ data: { session: null }, error: { message: 'Invalid token' } })
+      auth.signInWithApple.mockResolvedValue({ ok: false, error: 'Invalid token' })
       const tree = await render()
 
       await pressText(tree, 'Apple')
 
-      expect(supabase.auth.updateUser).not.toHaveBeenCalled()
-    })
-
-    it('still signs the user in if saving the name fails', async () => {
-      signedIn({ givenName: 'Ada' })
-      supabase.auth.updateUser.mockResolvedValue({ data: {}, error: { message: 'profile update failed' } })
-      const tree = await render()
-
-      await pressText(tree, 'Apple')
-
-      expect(useAuthStore.getState().session).toBe(SESSION)
-      expect(mockRouter.back).toHaveBeenCalled()
-      expect(hasText(tree, 'profile update failed')).toBe(false)
-    })
-
-    it('still signs the user in if saving the name throws', async () => {
-      signedIn({ givenName: 'Ada' })
-      supabase.auth.updateUser.mockRejectedValue(new Error('network'))
-      const tree = await render()
-
-      await pressText(tree, 'Apple')
-
-      expect(useAuthStore.getState().session).toBe(SESSION)
-      expect(mockRouter.back).toHaveBeenCalled()
+      expect(auth.saveDisplayName).not.toHaveBeenCalled()
     })
   })
 

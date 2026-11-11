@@ -1,7 +1,7 @@
 import React from 'react'
 import renderer, { act } from 'react-test-renderer'
 import SignupScreen from '@/app/(auth)/signup'
-import { AUTH_REDIRECTS } from '@/src/utils/authLinks'
+import { useAuthStore } from '@/src/store/authStore'
 import { hasText, hasTextContaining, inputByPlaceholder, pressByProps, pressText, typeInto } from '@/src/utils/testScreenHelpers'
 
 // First render of a screen is slow under parallel workers (RN + icon transforms); 5s is too tight.
@@ -11,14 +11,14 @@ const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn() }
 
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }))
 
-jest.mock('@/src/api/supabase', () => ({
-  supabase: { auth: { signUp: jest.fn() } },
-}))
+jest.mock('@/src/api/auth', () => ({ signUpWithEmail: jest.fn() }))
+jest.mock('@/src/api/purchases', () => ({ loginUser: jest.fn() }))
 
-const { supabase } = jest.requireMock('@/src/api/supabase') as {
-  supabase: { auth: { signUp: jest.Mock } }
-}
-const signUp = supabase.auth.signUp
+const { signUpWithEmail: signUp } = jest.requireMock('@/src/api/auth') as { signUpWithEmail: jest.Mock }
+const { loginUser } = jest.requireMock('@/src/api/purchases') as { loginUser: jest.Mock }
+
+const USER = { id: 'user-1', email: 'person@example.com', displayName: null, emailVerified: false }
+const SIGNED_UP = { ok: true, user: USER }
 
 async function render(): Promise<renderer.ReactTestRenderer> {
   let tree!: renderer.ReactTestRenderer
@@ -37,6 +37,8 @@ function fill(tree: renderer.ReactTestRenderer, email: string, password: string,
 describe('SignupScreen', () => {
   beforeEach(() => {
     signUp.mockReset()
+    loginUser.mockReset().mockResolvedValue(false)
+    useAuthStore.setState({ user: null, isLoading: false })
     Object.values(mockRouter).forEach((fn) => fn.mockReset())
   })
 
@@ -61,56 +63,45 @@ describe('SignupScreen', () => {
     expect(signUp).not.toHaveBeenCalled()
   })
 
-  it('signs up with a trimmed, lower-cased email and shows the confirmation screen', async () => {
-    signUp.mockResolvedValue({ data: {}, error: null })
+  it('creates the account with a trimmed, lower-cased email, signs in and mentions the verification email', async () => {
+    signUp.mockResolvedValue(SIGNED_UP)
     const tree = await render()
     fill(tree, '  Person@Example.COM ', 'password1', 'password1')
 
     await pressText(tree, 'Create Account')
 
-    expect(signUp).toHaveBeenCalledWith({
-      email: 'person@example.com',
-      password: 'password1',
-      options: { emailRedirectTo: 'skycast://confirm-email' },
-    })
-    expect(hasText(tree, 'Check your email')).toBe(true)
+    expect(signUp).toHaveBeenCalledWith('person@example.com', 'password1')
+    expect(useAuthStore.getState().user).toBe(USER)
+    expect(loginUser).toHaveBeenCalledWith('user-1')
+    expect(hasText(tree, "You're signed in")).toBe(true)
     expect(hasTextContaining(tree, 'person@example.com')).toBe(true)
   })
 
-  it('makes the confirmation email open the app instead of the project Site URL', async () => {
-    signUp.mockResolvedValue({ data: {}, error: null })
-    const tree = await render()
-    fill(tree, 'a@b.co', 'password1', 'password1')
-
-    await pressText(tree, 'Create Account')
-
-    expect(signUp.mock.calls[0]?.[0].options.emailRedirectTo).toBe(AUTH_REDIRECTS.confirmEmail)
-  })
-
-  it('returns to sign in from the confirmation screen', async () => {
-    signUp.mockResolvedValue({ data: {}, error: null })
+  it('dismisses from the success screen', async () => {
+    signUp.mockResolvedValue(SIGNED_UP)
     const tree = await render()
     fill(tree, 'a@b.co', 'password1', 'password1')
     await pressText(tree, 'Create Account')
 
-    await pressText(tree, 'Back to Sign In')
+    await pressText(tree, 'Continue')
 
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(auth)/login')
+    expect(mockRouter.back).toHaveBeenCalled()
   })
 
   it('shows the server error and stays on the form', async () => {
-    signUp.mockResolvedValue({ data: {}, error: { message: 'User already registered' } })
+    signUp.mockResolvedValue({ ok: false, error: 'An account with this email already exists. Try signing in.' })
     const tree = await render()
     fill(tree, 'a@b.co', 'password1', 'password1')
 
     await pressText(tree, 'Create Account')
 
-    expect(hasText(tree, 'User already registered')).toBe(true)
-    expect(hasText(tree, 'Check your email')).toBe(false)
+    expect(hasText(tree, 'An account with this email already exists. Try signing in.')).toBe(true)
+    expect(hasText(tree, "You're signed in")).toBe(false)
+    expect(useAuthStore.getState().user).toBeNull()
   })
 
   it('submits from the keyboard on the confirm-password field', async () => {
-    signUp.mockResolvedValue({ data: {}, error: null })
+    signUp.mockResolvedValue(SIGNED_UP)
     const tree = await render()
     fill(tree, 'a@b.co', 'password1', 'password1')
 

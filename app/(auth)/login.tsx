@@ -8,7 +8,10 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { GoogleSignin, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin'
-import { supabase } from '@/src/api/supabase'
+import {
+  createAppleNonce, saveDisplayName, signInWithApple, signInWithEmail, signInWithGoogle,
+  type AuthResult,
+} from '@/src/api/auth'
 import { useAuthStore } from '@/src/store/authStore'
 import { syncPurchasesForUser } from '@/src/utils/postSignIn'
 import {
@@ -29,25 +32,14 @@ GoogleSignin.configure({
  */
 async function saveAppleName(fullName: AppleAuthentication.AppleAuthenticationFullName | null): Promise<void> {
   if (!fullName) return
-  const { givenName, middleName, familyName } = fullName
-  const name = [givenName, middleName, familyName].filter(Boolean).join(' ')
+  const name = [fullName.givenName, fullName.middleName, fullName.familyName].filter(Boolean).join(' ')
   if (!name) return
-  try {
-    await supabase.auth.updateUser({
-      data: {
-        full_name: name,
-        ...(givenName ? { given_name: givenName } : {}),
-        ...(familyName ? { family_name: familyName } : {}),
-      },
-    })
-  } catch {
-    // ignore — see above
-  }
+  await saveDisplayName(name)
 }
 
 export default function LoginScreen() {
   const router = useRouter()
-  const { setSession } = useAuthStore()
+  const { setUser } = useAuthStore()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -57,8 +49,15 @@ export default function LoginScreen() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function afterSession(userId: string) {
-    await syncPurchasesForUser(userId)
+  /** Signed in → store the user, run any extra step, sync purchases, dismiss. Otherwise show the error. */
+  async function finishSignIn(result: AuthResult, beforeDismiss?: () => Promise<void>): Promise<void> {
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setUser(result.user)
+    if (beforeDismiss) await beforeDismiss()
+    await syncPurchasesForUser(result.user.id)
     router.back()
   }
 
@@ -69,19 +68,7 @@ export default function LoginScreen() {
     }
     setLoading(true)
     setError(null)
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    })
-    if (authError) {
-      setError(authError.message)
-      setLoading(false)
-      return
-    }
-    if (data.session) {
-      setSession(data.session)
-      await afterSession(data.session.user.id)
-    }
+    await finishSignIn(await signInWithEmail(email.trim().toLowerCase(), password))
     setLoading(false)
   }
 
@@ -90,21 +77,15 @@ export default function LoginScreen() {
     setError(null)
     try {
       await GoogleSignin.hasPlayServices()
-      const userInfo = await GoogleSignin.signIn()
+      const response = await GoogleSignin.signIn()
+      // v16 reports a cancelled sheet as a result rather than an error.
+      if (response.type === 'cancelled') return
       const tokens = await GoogleSignin.getTokens()
       if (!tokens.idToken) {
         setError('Google sign-in failed — no ID token returned.')
         return
       }
-      const { data, error: authError } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: tokens.idToken,
-      })
-      if (authError) { setError(authError.message); return }
-      if (data.session) {
-        setSession(data.session)
-        await afterSession(data.session.user.id)
-      }
+      await finishSignIn(await signInWithGoogle(tokens.idToken))
     } catch (e: unknown) {
       if (isErrorWithCode(e)) {
         if (e.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -128,26 +109,22 @@ export default function LoginScreen() {
     setAppleLoading(true)
     setError(null)
     try {
+      const nonce = await createAppleNonce()
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: nonce.hashed,
       })
       if (!credential.identityToken) {
         setError('Apple sign-in failed — no identity token returned.')
         return
       }
-      const { data, error: authError } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-      })
-      if (authError) { setError(authError.message); return }
-      if (data.session) {
-        setSession(data.session)
-        await saveAppleName(credential.fullName)
-        await afterSession(data.session.user.id)
-      }
+      await finishSignIn(
+        await signInWithApple(credential.identityToken, nonce.raw),
+        () => saveAppleName(credential.fullName),
+      )
     } catch (e: unknown) {
       if (e && typeof e === 'object' && 'code' in e && e.code === 'ERR_REQUEST_CANCELED') {
         // user cancelled — do nothing

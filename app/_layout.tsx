@@ -10,7 +10,7 @@ import { useLocation } from '@/src/hooks/useLocation'
 import { usePremiumStore } from '@/src/store/premiumStore'
 import { useAuthStore } from '@/src/store/authStore'
 import { initPurchases, checkPremiumStatus, loginUser } from '@/src/api/purchases'
-import { supabase } from '@/src/api/supabase'
+import { subscribeToAuthChanges, waitForInitialUser } from '@/src/api/auth'
 import { logger } from '@/src/utils/logger'
 import 'react-native-reanimated'
 
@@ -47,25 +47,25 @@ function LocationBootstrap(): null {
 
 function PremiumBootstrap(): null {
   const { hydrate, setPremium, loadQueryCount } = usePremiumStore()
-  const { setSession, setLoading } = useAuthStore()
+  const { setUser, setLoading } = useAuthStore()
 
   useEffect(() => {
     async function bootstrap() {
       // Restore premium from disk immediately — no network wait, no flash of locked state
       await hydrate()
 
-      // Bootstrap Supabase session from secure storage
+      // Wait for Firebase to restore any persisted sign-in
       setLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
+      const user = await waitForInitialUser()
+      setUser(user)
       setLoading(false)
 
       // Confirm premium with RevenueCat (may upgrade/downgrade the persisted status)
       await initPurchases()
       let isPremium: boolean
-      if (session?.user) {
-        // Logged-in user: link RevenueCat to their Supabase ID for cross-device sync
-        isPremium = await loginUser(session.user.id)
+      if (user) {
+        // Logged-in user: link RevenueCat to their Firebase ID for cross-device sync
+        isPremium = await loginUser(user.id)
       } else {
         isPremium = await checkPremiumStatus()
       }
@@ -76,12 +76,9 @@ function PremiumBootstrap(): null {
       logger.error('app.bootstrap', error instanceof Error ? error : 'Premium/auth bootstrap failed')
     })
 
-    // Keep auth store in sync with Supabase session changes (token refresh, sign-out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-    return () => subscription.unsubscribe()
-  }, [hydrate, setPremium, loadQueryCount, setSession, setLoading])
+    // Keep auth store in sync with Firebase sign-in/sign-out
+    return subscribeToAuthChanges(setUser)
+  }, [hydrate, setPremium, loadQueryCount, setUser, setLoading])
 
   return null
 }

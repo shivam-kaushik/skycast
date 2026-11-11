@@ -79,15 +79,13 @@ describe('TabLayout', () => {
 })
 
 describe('AuthLayout', () => {
-  it('registers the sign-in screens plus the two screens Supabase email links open', () => {
+  it('registers the sign-in screens', () => {
     const tree = render(<AuthLayout />)
 
     expect(find(tree, 'StackScreenStub').map((s) => s.props.name)).toEqual([
       'login',
       'signup',
       'forgot',
-      'reset-password',
-      'confirm-email',
     ])
   })
 

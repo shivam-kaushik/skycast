@@ -40,8 +40,9 @@ jest.mock('@/src/api/purchases', () => ({
   loginUser: jest.fn(),
 }))
 
-jest.mock('@/src/api/supabase', () => ({
-  supabase: { auth: { getSession: jest.fn(), onAuthStateChange: jest.fn() } },
+jest.mock('@/src/api/auth', () => ({
+  waitForInitialUser: jest.fn(),
+  subscribeToAuthChanges: jest.fn(),
 }))
 
 jest.mock('@/src/utils/logger', () => ({
@@ -52,15 +53,13 @@ const { __premium: premium } = jest.requireMock('@/src/store/premiumStore') as {
   __premium: Record<'hydrate' | 'setPremium' | 'loadQueryCount', jest.Mock>
 }
 const purchases = jest.requireMock('@/src/api/purchases') as Record<'initPurchases' | 'checkPremiumStatus' | 'loginUser', jest.Mock>
-const { supabase } = jest.requireMock('@/src/api/supabase') as {
-  supabase: { auth: { getSession: jest.Mock; onAuthStateChange: jest.Mock } }
-}
+const auth = jest.requireMock('@/src/api/auth') as Record<'waitForInitialUser' | 'subscribeToAuthChanges', jest.Mock>
 
 const mockUseFonts = useFonts as jest.Mock
-const SESSION = { access_token: 'tok', user: { id: 'user-1', email: 'a@b.co' } }
+const USER = { id: 'user-1', email: 'a@b.co', displayName: null, emailVerified: true }
 const unsubscribe = jest.fn()
 let trees: renderer.ReactTestRenderer[] = []
-let authListener: (event: string, session: unknown) => void = () => {}
+let authListener: (user: unknown) => void = () => {}
 
 async function render(): Promise<renderer.ReactTestRenderer> {
   let tree!: renderer.ReactTestRenderer
@@ -85,13 +84,13 @@ beforeEach(() => {
   purchases.checkPremiumStatus.mockResolvedValue(false)
   purchases.loginUser.mockResolvedValue(false)
   unsubscribe.mockReset()
-  supabase.auth.getSession.mockReset().mockResolvedValue({ data: { session: null } })
-  supabase.auth.onAuthStateChange.mockReset().mockImplementation((cb: typeof authListener) => {
+  auth.waitForInitialUser.mockReset().mockResolvedValue(null)
+  auth.subscribeToAuthChanges.mockReset().mockImplementation((cb: typeof authListener) => {
     authListener = cb
-    return { data: { subscription: { unsubscribe } } }
+    return unsubscribe
   })
   ;(logger.error as jest.Mock).mockReset()
-  useAuthStore.setState({ user: null, session: null, isLoading: false })
+  useAuthStore.setState({ user: null, isLoading: false })
 })
 
 afterEach(() => {
@@ -131,7 +130,7 @@ describe('RootLayout — premium/auth bootstrap', () => {
     expect(premium.hydrate).toHaveBeenCalledTimes(1)
   })
 
-  it('checks RevenueCat directly and keeps the store signed out when there is no session', async () => {
+  it('checks RevenueCat directly and keeps the store signed out when nobody is signed in', async () => {
     purchases.checkPremiumStatus.mockResolvedValue(true)
     await render()
     await bootstrapped()
@@ -139,7 +138,7 @@ describe('RootLayout — premium/auth bootstrap', () => {
     expect(purchases.initPurchases).toHaveBeenCalled()
     expect(purchases.checkPremiumStatus).toHaveBeenCalled()
     expect(purchases.loginUser).not.toHaveBeenCalled()
-    expect(useAuthStore.getState().session).toBeNull()
+    expect(useAuthStore.getState().user).toBeNull()
     expect(premium.setPremium).toHaveBeenCalledWith(true)
     expect(premium.loadQueryCount).toHaveBeenCalled()
     expect(useAuthStore.getState().isLoading).toBe(false)
@@ -154,14 +153,13 @@ describe('RootLayout — premium/auth bootstrap', () => {
     expect(premium.loadQueryCount).not.toHaveBeenCalled()
   })
 
-  it('restores the session and links RevenueCat to the signed-in user', async () => {
-    supabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } })
+  it('restores the signed-in user and links RevenueCat to them', async () => {
+    auth.waitForInitialUser.mockResolvedValue(USER)
     purchases.loginUser.mockResolvedValue(true)
     await render()
     await bootstrapped()
 
-    expect(useAuthStore.getState().session).toBe(SESSION)
-    expect(useAuthStore.getState().user).toBe(SESSION.user)
+    expect(useAuthStore.getState().user).toBe(USER)
     expect(purchases.loginUser).toHaveBeenCalledWith('user-1')
     expect(purchases.checkPremiumStatus).not.toHaveBeenCalled()
     expect(premium.setPremium).toHaveBeenCalledWith(true)
@@ -171,11 +169,10 @@ describe('RootLayout — premium/auth bootstrap', () => {
     const tree = await render()
     await bootstrapped()
 
-    act(() => authListener('SIGNED_IN', SESSION))
-    expect(useAuthStore.getState().session).toBe(SESSION)
+    act(() => authListener(USER))
+    expect(useAuthStore.getState().user).toBe(USER)
 
-    act(() => authListener('SIGNED_OUT', null))
-    expect(useAuthStore.getState().session).toBeNull()
+    act(() => authListener(null))
     expect(useAuthStore.getState().user).toBeNull()
 
     act(() => tree.unmount())
@@ -183,8 +180,8 @@ describe('RootLayout — premium/auth bootstrap', () => {
   })
 
   it('logs a bootstrap failure instead of crashing the app', async () => {
-    const failure = new Error('secure store unavailable')
-    supabase.auth.getSession.mockRejectedValue(failure)
+    const failure = new Error('firebase unavailable')
+    auth.waitForInitialUser.mockRejectedValue(failure)
     const tree = await render()
 
     await waitFor(() => (logger.error as jest.Mock).mock.calls.length > 0)
